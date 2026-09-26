@@ -12,6 +12,7 @@ public class CharacterCardUI : MonoBehaviour
     public TextMeshProUGUI abilityNameText;
     public TextMeshProUGUI abilityDescriptionText;
     public Image selectedVisual;
+    public Image portraitImage;
     public Button cardButton;
 
     private CharacterData currentData;
@@ -30,6 +31,11 @@ public class CharacterCardUI : MonoBehaviour
         if (abilityNameText != null) abilityNameText.text = data.abilityName;
         if (abilityDescriptionText != null) abilityDescriptionText.text = data.abilityDescription;
         
+        if (portraitImage != null && data.characterImage != null) 
+        {
+            portraitImage.sprite = data.characterImage;
+        }
+
         SetSelected(false);
 
         if (cardButton != null)

@@ -16,43 +16,122 @@ public class NetworkConnectUI : MonoBehaviour
 
     private void Start()
     {
-        // Muestra la IP local en pantalla por defecto para que el Host la conozca
-        ipAddressText.text = "Tu IP: " + GetLocalIPAddress();
+        if (ipAddressText != null)
+        {
+            ipAddressText.text = "Tu IP: " + GetLocalIPAddress();
+        }
     }
 
     public void StartHost()
     {
-        var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
-        // El Host debe escuchar en 0.0.0.0 (acepta conexiones de cualquier red local)
+        NetworkManager networkManager = NetworkManager.Singleton;
+
+        if (networkManager == null)
+        {
+            Debug.LogError("No se encontró NetworkManager.");
+            return;
+        }
+
+        if (networkManager.IsListening)
+        {
+            Debug.LogWarning("El NetworkManager ya se esta ejecutando. No se puede iniciar otro Host.");
+            return;
+        }
+
+        UnityTransport transport = networkManager.GetComponent<UnityTransport>();
+
+        if (transport == null)
+        {
+            Debug.LogError("No se encontró UnityTransport en el NetworkManager.");
+            return;
+        }
+
         transport.SetConnectionData("0.0.0.0", port);
 
-        if (NetworkManager.Singleton.StartHost())
+        if (networkManager.StartHost())
         {
-            ipAddressText.text = "Hosteando en: " + GetLocalIPAddress();
+            string localIP = GetLocalIPAddress();
+
+            if (ipAddressText != null)
+            {
+                ipAddressText.text = "Hosteando en: " + localIP;
+            }
+
+            Debug.Log("Host iniciado correctamente.");
+            Debug.Log("IP LAN: " + localIP);
+            Debug.Log("Puerto: " + port);
+        }
+        else
+        {
+            Debug.LogError("No se pudo iniciar el Host.");
         }
     }
 
     public void StartClient()
     {
-        var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
-        // Usa la IP del input, o localhost si está vacío
-        string joinIp = string.IsNullOrEmpty(ipInputField.text) ? "127.0.0.1" : ipInputField.text;
+        NetworkManager networkManager = NetworkManager.Singleton;
 
-        // El cliente se conecta a la IP ingresada
+        if (networkManager == null)
+        {
+            Debug.LogError("No se encontró NetworkManager.");
+            return;
+        }
+
+        if (networkManager.IsListening)
+        {
+            Debug.LogWarning("El NetworkManager ya está conectado o escuchando.");
+            return;
+        }
+
+        UnityTransport transport = networkManager.GetComponent<UnityTransport>();
+
+        if (transport == null)
+        {
+            Debug.LogError("No se encontró UnityTransport en el NetworkManager.");
+            return;
+        }
+
+        string joinIp = "127.0.0.1";
+
+        if (ipInputField != null && !string.IsNullOrWhiteSpace(ipInputField.text))
+        {
+            joinIp = ipInputField.text.Trim();
+        }
+
+        // Conectarse a la IP del Host
         transport.SetConnectionData(joinIp, port);
-        NetworkManager.Singleton.StartClient();
+
+        if (networkManager.StartClient())
+        {
+            Debug.Log("Intentando conectar al Host: " + joinIp + ":" + port);
+        }
+        else
+        {
+            Debug.LogError("No se pudo iniciar el Cliente.");
+        }
     }
 
     private string GetLocalIPAddress()
     {
-        var host = Dns.GetHostEntry(Dns.GetHostName());
-        foreach (var ip in host.AddressList)
+        try
         {
-            if (ip.AddressFamily == AddressFamily.InterNetwork)
+            string hostName = Dns.GetHostName();
+            IPHostEntry host = Dns.GetHostEntry(hostName);
+
+            foreach (IPAddress ip in host.AddressList)
             {
-                return ip.ToString();
+                if (ip.AddressFamily == AddressFamily.InterNetwork &&
+                    !IPAddress.IsLoopback(ip))
+                {
+                    return ip.ToString();
+                }
             }
         }
+        catch (System.Exception e)
+        {
+            Debug.LogError("Error obteniendo la IP local: " + e.Message);
+        }
+
         return "127.0.0.1";
     }
 }

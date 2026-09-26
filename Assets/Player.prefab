@@ -13,9 +13,9 @@ GameObject:
   - component: {fileID: 3258910608625064462}
   - component: {fileID: 8427020054080541518}
   - component: {fileID: 5832921979850687128}
-  - component: {fileID: 2631268746837758799}
   - component: {fileID: 1232540789441357343}
   - component: {fileID: 3757754634629862763}
+  - component: {fileID: 8337647915962830466}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -145,69 +145,6 @@ MonoBehaviour:
   AutoObjectParentSync: 1
   SyncOwnerTransformWhenParented: 1
   AllowOwnerToParent: 0
---- !u!114 &2631268746837758799
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2104364659987901470}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 55978842be948b54e9c1b930fc3e776a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PlayerController
-  ShowTopMostFoldoutHeaderGroup: 1
-  moveSpeed: 5
-  moveAction:
-    m_Name: Move
-    m_Type: 0
-    m_ExpectedControlType: 
-    m_Id: 9fce2d8e-28b3-4de5-958b-48e379866144
-    m_Processors: 
-    m_Interactions: 
-    m_SingletonActionBindings:
-    - m_Name: 2D Vector
-      m_Id: ec1f9392-6857-48fa-a6bf-ef2174a276dc
-      m_Path: 2DVector
-      m_Interactions: 
-      m_Processors: 
-      m_Groups: 
-      m_Action: Move
-      m_Flags: 4
-    - m_Name: up
-      m_Id: 8c8f695f-c144-450c-8552-17bbbf800465
-      m_Path: <Keyboard>/w
-      m_Interactions: 
-      m_Processors: 
-      m_Groups: 
-      m_Action: Move
-      m_Flags: 8
-    - m_Name: down
-      m_Id: 62c2f0b9-bbda-43b4-89d2-c70dc50833e1
-      m_Path: <Keyboard>/s
-      m_Interactions: 
-      m_Processors: 
-      m_Groups: 
-      m_Action: Move
-      m_Flags: 8
-    - m_Name: left
-      m_Id: 01108707-0392-40e9-9e74-1e4167e9da91
-      m_Path: <Keyboard>/a
-      m_Interactions: 
-      m_Processors: 
-      m_Groups: 
-      m_Action: Move
-      m_Flags: 8
-    - m_Name: right
-      m_Id: 7e70195a-354d-4922-a150-350ddd80e5e9
-      m_Path: <Keyboard>/d
-      m_Interactions: 
-      m_Processors: 
-      m_Groups: 
-      m_Action: Move
-      m_Flags: 8
-    m_Flags: 0
 --- !u!143 &1232540789441357343
 CharacterController:
   m_ObjectHideFlags: 0
@@ -279,3 +216,17 @@ MonoBehaviour:
   SwitchTransformSpaceWhenParented: 0
   Interpolate: 1
   SlerpPosition: 0
+--- !u!114 &8337647915962830466
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2104364659987901470}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 233fdf51fabdba64daf2b4e508401645, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CharacterMovement
+  ShowTopMostFoldoutHeaderGroup: 1
+  speed: 5

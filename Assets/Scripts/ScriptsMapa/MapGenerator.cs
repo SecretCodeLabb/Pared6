@@ -80,10 +80,6 @@ public class MapGenerator : MonoBehaviour
         Debug.Log("Mapa generado. Seed: " + seed);
     }
 
-    // =========================================================
-    // MAPA CENTRAL
-    // =========================================================
-
     private void CreateTiles()
     {
         for (int x = 0; x < width; x++)

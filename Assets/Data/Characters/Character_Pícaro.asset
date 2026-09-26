@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: "Character_P\xEDcaro"
   m_EditorClassIdentifier: Assembly-CSharp::CharacterData
   characterName: Vagabundo
+  characterImage: {fileID: 21300000, guid: 0737ac2c7d6f88b4a97573fb83a98dfb, type: 3}
   description: Resistente gracias a sus "aventuras" en la calle
   maxLives: 3
   baseDamage: 6
