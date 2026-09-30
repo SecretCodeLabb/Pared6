@@ -1,3 +1,4 @@
+using TMPro;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -13,6 +14,9 @@ public class BoardManager : MonoBehaviour
     public int minDiceValue = 1;
     public int maxDiceValue = 6;
 
+    [Header("UI")]
+    public TextMeshProUGUI gameInfoText;
+
     private List<Tile> allTiles =
         new List<Tile>();
 
@@ -22,6 +26,8 @@ public class BoardManager : MonoBehaviour
     {
         InitializeBoard();
         SpawnPlayer();
+
+        UpdateGameInfo();
     }
 
     // =========================================================
@@ -154,6 +160,8 @@ public class BoardManager : MonoBehaviour
 
         player.SetMoves(result);
 
+        UpdateGameInfo(result);
+
         Debug.Log(
             "Dado: " +
             result
@@ -254,6 +262,45 @@ public class BoardManager : MonoBehaviour
             nextTile
         );
 
+        UpdateGameInfo();
+
         return true;
+    }
+
+    // =========================================================
+    // UI
+    // =========================================================
+
+    public void UpdateGameInfo()
+    {
+        if (gameInfoText == null)
+            return;
+
+        if (player == null)
+        {
+            gameInfoText.text =
+                "Dado: -\n" +
+                "Movimientos restantes: 0";
+
+            return;
+        }
+
+        gameInfoText.text =
+            "Dado: -\n" +
+            "Movimientos restantes: " +
+            player.remainingMoves;
+    }
+
+    public void UpdateGameInfo(int diceResult)
+    {
+        if (gameInfoText == null)
+            return;
+
+        gameInfoText.text =
+            "Dado: " +
+            diceResult +
+            "\n" +
+            "Movimientos restantes: " +
+            player.remainingMoves;
     }
 }

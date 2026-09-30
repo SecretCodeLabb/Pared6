@@ -44,8 +44,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 63d2371d5c05b9845bae27ae80300abc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RoomBuilder
-  width: 4
-  height: 4
+  width: 5
+  height: 5
   tilePrefab: {fileID: 5451176648331968537, guid: 75bdf5efbe248ee4aa9c8f47eee8b6a3, type: 3}
   tileSize: 2
   southEntrance: 1

@@ -318,18 +318,21 @@ public class RoomBuilder : MonoBehaviour
         if (!southEntrance)
             return;
 
-        int entranceX =
-            width / 2;
-
+        int entranceX = width / 2;
         int entranceY = 0;
 
-        Tile entranceTile =
-            tiles[
-                entranceX,
-                entranceY
-            ];
+        Tile entranceTile = tiles[entranceX, entranceY];
 
-        // Abrir la entrada hacia el mapa central
+        if (entranceTile == null)
+        {
+            Debug.LogError(
+                "RoomBuilder: No se encontró el tile de entrada."
+            );
+
+            return;
+        }
+
+        // La entrada debe quedar SIEMPRE abierta.
         entranceTile.southWall = false;
     }
 
