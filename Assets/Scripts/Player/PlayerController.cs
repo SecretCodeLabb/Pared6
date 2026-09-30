@@ -113,54 +113,44 @@ public class PlayerController : MonoBehaviour
         if (targetTile == null)
             return;
 
-        currentTile =
-            targetTile;
-
+        currentTile = targetTile;
         remainingMoves--;
 
         StopAllCoroutines();
 
         StartCoroutine(
-            MoveRoutine(
-                targetTile.transform.position
-            )
+            MoveRoutine(targetTile.transform.position)
         );
 
-        Debug.Log(
-            "Movimientos restantes: " +
-            remainingMoves
-        );
+        Debug.Log("Movimientos restantes: " + remainingMoves);
     }
 
     // =========================================================
     // MOVIMIENTO SUAVE
     // =========================================================
 
-    private System.Collections.IEnumerator MoveRoutine(
-        Vector3 targetPosition)
+    private System.Collections.IEnumerator MoveRoutine(Vector3 targetPosition)
     {
         isMoving = true;
 
-        while (
-            Vector3.Distance(
-                transform.position,
-                targetPosition
-            ) > 0.01f)
+        while (Vector3.Distance(transform.position, targetPosition) > 0.01f)
         {
-            transform.position =
-                Vector3.MoveTowards(
-                    transform.position,
-                    targetPosition,
-                    moveSpeed *
-                    Time.deltaTime
-                );
+            transform.position = Vector3.MoveTowards(
+                transform.position,
+                targetPosition,
+                moveSpeed * Time.deltaTime
+            );
 
             yield return null;
         }
 
-        transform.position =
-            targetPosition;
+        transform.position = targetPosition;
 
         isMoving = false;
+
+        if (EventManager.Instance != null)
+        {
+            EventManager.Instance.CheckTile(currentTile);
+        }
     }
 }

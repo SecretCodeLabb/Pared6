@@ -77,6 +77,11 @@ public class MapGenerator : MonoBehaviour
             GenerateRooms();
         }
 
+        if (EventManager.Instance != null)
+        {
+            EventManager.Instance.GenerateEventTiles();
+        }
+
         Debug.Log("Mapa generado. Seed: " + seed);
     }
 

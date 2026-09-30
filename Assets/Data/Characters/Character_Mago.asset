@@ -14,10 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CharacterData
   characterName: Puppy
   characterImage: {fileID: 21300000, guid: 308a5f5a8cb37ce48a229231e51c231b, type: 3}
-  description: Siempre de fiesta le pica la casa
+  description: 
   maxLives: 3
   baseDamage: 2
   baseDefense: 2
-  abilityName: Bolso magico
-  abilityDescription: tiene una carta especial guardad en su bolso, quien sabe para
-    que sirva
+  abilityName: Bolso de fiesta
+  abilityDescription: Puede sacar una habilidad especial de uso desconocido.

@@ -14,9 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CharacterData
   characterName: Vagabundo
   characterImage: {fileID: 21300000, guid: 0737ac2c7d6f88b4a97573fb83a98dfb, type: 3}
-  description: Resistente gracias a sus "aventuras" en la calle
+  description: 
   maxLives: 3
   baseDamage: 6
   baseDefense: 6
-  abilityName: Sople golpe
-  abilityDescription: pegas mas fuerte a los jugadores... ahh pero las entidades
+  abilityName: Golpe bolsa
+  abilityDescription: "Toma su bolsa y pega m\xE1s fuerte a los jugadores, pero es
+    d\xE9bil contra entidades."

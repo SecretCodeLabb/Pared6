@@ -14,9 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CharacterData
   characterName: Estudiante
   characterImage: {fileID: 21300000, guid: 83515249d1e1d424fa0bdb890c4b7214, type: 3}
-  description: Todo el dia en el celular
+  description: 
   maxLives: 3
   baseDamage: 3
   baseDefense: 3
-  abilityName: Procastinar
-  abilityDescription: Puedes escapar de eventos pero se acomulan para mas adelante
+  abilityName: Scroll time
+  abilityDescription: "Usa su poder de procrastinar para saltarse combates, pero
+    se le acumulan para m\xE1s tarde."
