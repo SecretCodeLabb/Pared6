@@ -4,28 +4,28 @@
 
 ## EN CURSO
 - Tarea: (ninguna)
-- Último paso hecho: T02 - Conexión LAN Host/Client implementada, probada a nivel de compilación y sincronización de conteo de jugadores.
-- Siguiente paso: T03 - Sala de espera (escena de selección como lobby).
+- Último paso hecho: T03–T16 completadas en una sola sesión (a petición del usuario). Prototipo jugable de principio a fin.
+- Siguiente paso: pruebas manuales con ParrelSync (ver `docs/TEST_PLAN.md`) y decidir siguientes mecánicas.
 
 ## Tareas
 | ID | Tarea | Estado |
 |---|---|---|
 | T01 | Auditoría del proyecto | ✅ |
 | T02 | Conexión LAN Host/Client | ✅ |
-| T03 | Sala de espera (escena de selección como lobby) | ⬜ |
-| T04 | Selección de personaje sincronizada + LISTO + START | ⬜ |
-| T05 | Escena Game y tablero determinista | ⬜ |
-| T06 | Spawn y sincronización de jugadores | ⬜ |
-| T07 | Turnos y máquina de estados | ⬜ |
-| T08 | Dado y movimiento sincronizados | ⬜ |
-| T09 | Integración de EventTile | ⬜ |
-| T10 | Combate base | ⬜ |
-| T11 | Vidas y eliminación | ⬜ |
-| T12 | Cartas: datos, reparto y mano | ⬜ |
-| T13 | Uso de cartas en combate | ⬜ |
-| T14 | Progreso, victoria, fin y reinicio | ⬜ |
-| T15 | UI completa y casos límite | ⬜ |
-| T16 | Pruebas end-to-end | ⬜ |
+| T03 | Sala de espera (escena de selección como lobby) | ✅ |
+| T04 | Selección de personaje sincronizada + LISTO + START | ✅ |
+| T05 | Escena Game y tablero determinista | ✅ |
+| T06 | Spawn y sincronización de jugadores | ✅ |
+| T07 | Turnos y máquina de estados | ✅ |
+| T08 | Dado y movimiento sincronizados | ✅ |
+| T09 | Integración de EventTile | ✅ |
+| T10 | Combate base | ✅ |
+| T11 | Vidas y eliminación | ✅ |
+| T12 | Cartas: datos, reparto y mano | ✅ |
+| T13 | Uso de cartas en combate | ✅ |
+| T14 | Progreso, victoria, fin y reinicio | ✅ |
+| T15 | UI completa y casos límite | ✅ |
+| T16 | Pruebas end-to-end | ✅ (26 tests EditMode; E2E con build + bots, ver TEST_PLAN) |
 
 ## Decisiones tomadas
 - **NGO 2.x:** El proyecto cuenta con Netcode for GameObjects 2.13.2 y Unity Transport 2.7.3, por lo que se empleará la sintaxis RPC moderna (`[Rpc(SendTo.Server)]`, `[Rpc(SendTo.ClientsAndHost)]`).
@@ -35,7 +35,22 @@
 - **Detección ParrelSync:** Logs etiquetados con `[ParrelSync Clon]` / `[Unity Original]` mediante `#if UNITY_EDITOR` y `ParrelSync.ClonesManager.IsClone()`.
 - **Build Settings:** Registradas las 3 escenas (`LobbyScene`, `CharacterSelection`, `Mapa`) en `EditorBuildSettings.asset`.
 
+- **Flujo de escenas:** `LobbyScene` (menú) → `CharacterSelection` (sala) → `Mapa` (partida). Respuesta a Pregunta 1.
+- **Sesión persistente:** prefab `Prefabs/Network/NetworkSession` (NetworkObject + `LobbyManager`), lo spawnea el Host y vive en DontDestroyOnLoad; contiene los slots (PlayerId 0–3, ClientId, personaje, LISTO).
+- **Config única:** `Resources/GameRules.asset` (todos los valores de AGENT_CONTEXT §6). `NetworkConnectionManager` lee de ahí `maxPlayers` y puerto.
+- **Lógica pura** en el ensamblado `Pared.Rules` (`Scripts/Game/Rules` + `Scripts/Cards/Data` vía `.asmref`) para tests EditMode.
+- **Tablero:** `MapGenerator.GenerateWithSeed` (mismo RNG global sembrado; sin cambios de estructura). Casilla lógica = posición mundial redondeada (`BoardManager.CellOf`), única también en habitaciones. Eventos elegidos por el Host (`NetworkList<Vector2Int>`); al consumirse se quitan de la lista. Hash FNV-1a de paredes + eventos comparado en el Host.
+- **Spawn (Pregunta 2):** bloque central 2x2 alrededor del centro, sin eventos. **Visual (Pregunta 3):** cápsula existente teñida con `CharacterData.boardColor` + etiqueta con nombre.
+- **Turnos:** RPCs en `TurnManager` / `CombatManager` validados con `ValidateActivePlayer`. Empieza PlayerId 0 (configurable aleatorio). Timeout opcional.
+- **Combate/cartas:** tipos del usuario como assets `CardType` (Daño, Defensa, Habilidad, Inútil). Daño +n = `AddToRoll(n)`; Defensa −n = `ReduceDamage(n)`. `ReduceRequired` y `PreventLifeLoss` disponibles sin asignar. Un evento fallado no se consume.
+- **Empates:** solo el jugador activo puede ganar progreso, así que no hay empate real; si ocurriera, gana el activo y si no, el PlayerId más bajo (`VictoryRules`).
+- **REINICIAR:** vuelve a `CharacterSelection` (personajes conservados, LISTO reseteado, conexiones aceptadas de nuevo). Más estable que recargar `Mapa`.
+- **VOLVER AL MENÚ:** `NetworkConnectionManager.ReturnToMenu` (Shutdown + destruye el NetworkManager persistente; el de `LobbyScene` toma el relevo). Clientes vuelven solos si el Host cierra.
+- **Canvas de `Mapa`:** pasado de Constant Pixel Size a Scale With Screen Size (ref. 3840x2160): mismo aspecto en 4K, visible en 1080p.
+- **Pruebas:** `DevAutoPlayer` (solo Editor/Development Build) para E2E automático multi-instancia.
+
 ## Problemas abiertos
-- Pregunta 1: Confirmar flujo de escenas: `LobbyScene` ➔ `CharacterSelection` ➔ `Mapa`.
-- Pregunta 2: Confirmar posiciones de spawn de 2-4 jugadores en `Mapa` (¿casilla central compartida o repartidos en habitaciones cardinales?).
-- Pregunta 3: Confirmar representación visual de los personajes en el tablero 3D (¿distinción por color/material o icono de retrato?).
+- Habitaciones laterales inaccesibles (entrada desplazada media casilla respecto a la salida central y lógica de paredes sin rotación). Preexistente; no se tocó por la regla de paredes.
+- Cliente cerrado a la fuerza: ~30 s hasta marcarse DESCONECTADO (timeout de Unity Transport; ajustable en `UnityTransport.DisconnectTimeoutMS`).
+- Timeout de turno implementado pero no probado (desactivado por defecto).
+- 4 jugadores reales sin probar (3 sí; lógica de 4 cubierta por tests).
