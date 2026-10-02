@@ -6,8 +6,13 @@ public class EventManager : MonoBehaviour
     public static EventManager Instance;
 
     [Header("Event Settings")]
-    [Range(1, 20)]
+    [Tooltip("Event tiles on the central board.")]
+    [Range(1, 40)]
     public int eventTileCount = 5;
+
+    [Tooltip("Event tiles inside each side room.")]
+    [Range(0, 20)]
+    public int eventsPerRoom = 3;
 
     [Header("References")]
     public MapGenerator mapGenerator;
@@ -15,6 +20,8 @@ public class EventManager : MonoBehaviour
     [Header("Visual")]
     public GameObject eventIndicatorPrefab;
     public float eventIndicatorHeight = 0.5f;
+    [Tooltip("Multiplier on the indicator prefab's scale so events are easy to spot.")]
+    [Min(0.1f)] public float eventIndicatorScale = 1f;
 
     private List<EventTile> eventTiles = new List<EventTile>();
 
@@ -29,69 +36,108 @@ public class EventManager : MonoBehaviour
         Instance = this;
     }
 
+    // =========================================================
+    // OFFLINE: el generador local sortea los eventos
+    // =========================================================
+
     public void GenerateEventTiles()
     {
-        eventTiles.Clear();
-
         if (mapGenerator == null)
         {
             Debug.LogError("EventManager: No hay MapGenerator asignado.");
             return;
         }
 
-        List<Tile> centralTiles = new List<Tile>();
+        List<Tile> tiles = new List<Tile>(mapGenerator.GetComponentsInChildren<Tile>());
+        System.Random rng = new System.Random(Random.Range(int.MinValue, int.MaxValue));
 
-        Tile[] allTiles = mapGenerator.GetComponentsInChildren<Tile>();
+        List<Vector2Int> cells = PickEventCells(tiles, rng, new HashSet<Vector2Int>());
+        ApplyEventCells(tiles, cells);
+    }
 
-        foreach (Tile tile in allTiles)
+    // =========================================================
+    // RED (T05 / T09): el Host decide, todos aplican
+    // =========================================================
+
+    /// <summary>
+    /// Picks event cells spread over the whole map: eventTileCount on the central board and
+    /// eventsPerRoom inside every room. Deterministic for a given RNG; excluded cells are skipped.
+    /// </summary>
+    public List<Vector2Int> PickEventCells(
+        IEnumerable<Tile> tiles,
+        System.Random rng,
+        ICollection<Vector2Int> excluded)
+    {
+        Dictionary<BoardRegion, List<Vector2Int>> byRegion = new Dictionary<BoardRegion, List<Vector2Int>>();
+
+        foreach (Tile tile in tiles)
         {
-            if (IsCentralTile(tile))
+            Vector2Int cell = BoardManager.CellOf(tile);
+
+            if (excluded.Contains(cell))
+                continue;
+
+            if (!byRegion.TryGetValue(tile.region, out List<Vector2Int> list))
             {
-                centralTiles.Add(tile);
+                list = new List<Vector2Int>();
+                byRegion[tile.region] = list;
+            }
+
+            list.Add(cell);
+        }
+
+        List<Vector2Int> picked = new List<Vector2Int>();
+        BoardRegion[] order = { BoardRegion.Center, BoardRegion.North, BoardRegion.South, BoardRegion.East, BoardRegion.West };
+
+        foreach (BoardRegion region in order)
+        {
+            if (!byRegion.TryGetValue(region, out List<Vector2Int> candidates))
+                continue;
+
+            candidates.Sort((a, b) => a.x != b.x ? a.x.CompareTo(b.x) : a.y.CompareTo(b.y));
+            int amount = Mathf.Min(region == BoardRegion.Center ? eventTileCount : eventsPerRoom, candidates.Count);
+
+            for (int i = 0; i < amount; i++)
+            {
+                int index = rng.Next(candidates.Count);
+                picked.Add(candidates[index]);
+                candidates.RemoveAt(index);
             }
         }
 
-        if (centralTiles.Count == 0)
+        return picked;
+    }
+
+    /// <summary>All instances: marks the given cells as event tiles with the existing indicator.</summary>
+    public void ApplyEventCells(IEnumerable<Tile> tiles, IEnumerable<Vector2Int> cells)
+    {
+        Dictionary<Vector2Int, Tile> lookup = new Dictionary<Vector2Int, Tile>();
+
+        foreach (Tile tile in tiles)
+            lookup[BoardManager.CellOf(tile)] = tile;
+
+        eventTiles.Clear();
+
+        foreach (Vector2Int cell in cells)
         {
-            Debug.LogError("EventManager: No se encontraron tiles del mapa central.");
-            return;
-        }
+            if (!lookup.TryGetValue(cell, out Tile tile))
+            {
+                Debug.LogError("EventManager: event cell " + cell + " does not exist on this board.");
+                continue;
+            }
 
-        int amount = Mathf.Min(eventTileCount, centralTiles.Count);
-
-        for (int i = 0; i < amount; i++)
-        {
-            int randomIndex = Random.Range(0, centralTiles.Count);
-
-            Tile selectedTile = centralTiles[randomIndex];
-
-            centralTiles.RemoveAt(randomIndex);
-
-            EventTile eventTile = selectedTile.GetComponent<EventTile>();
+            EventTile eventTile = tile.GetComponent<EventTile>();
 
             if (eventTile == null)
-            {
-                eventTile = selectedTile.gameObject.AddComponent<EventTile>();
-            }
+                eventTile = tile.gameObject.AddComponent<EventTile>();
 
             eventTile.hasEvent = true;
             eventTile.ResetEvent();
-
             CreateIndicator(eventTile);
-
             eventTiles.Add(eventTile);
-
-            Debug.Log(
-                "Casilla de evento asignada: " +
-                selectedTile.gridPosition
-            );
         }
 
-        Debug.Log(
-            "EventManager: " +
-            eventTiles.Count +
-            " casillas de evento generadas."
-        );
+        Debug.Log("EventManager: " + eventTiles.Count + " casillas de evento.");
     }
 
     private void CreateIndicator(EventTile eventTile)
@@ -111,80 +157,18 @@ public class EventManager : MonoBehaviour
         );
 
         indicator.transform.localRotation = Quaternion.identity;
+        indicator.transform.localScale *= eventIndicatorScale;
         eventTile.indicator = indicator;
     }
 
-    // =========================================================
-    // RED (T05 / T09): el Host decide, todos aplican
-    // =========================================================
-
-    /// <summary>Host only: picks event cells among central tiles, excluding the given cells.</summary>
-    public List<Vector2Int> PickEventCells(
-        BoardManager board,
-        System.Random rng,
-        ICollection<Vector2Int> excluded)
-    {
-        List<Vector2Int> candidates = new List<Vector2Int>();
-
-        foreach (Tile tile in board.GetCentralTiles())
-        {
-            Vector2Int cell = BoardManager.CellOf(tile);
-
-            if (!excluded.Contains(cell))
-                candidates.Add(cell);
-        }
-
-        candidates.Sort((a, b) => a.x != b.x ? a.x.CompareTo(b.x) : a.y.CompareTo(b.y));
-
-        List<Vector2Int> picked = new List<Vector2Int>();
-        int amount = Mathf.Min(eventTileCount, candidates.Count);
-
-        for (int i = 0; i < amount; i++)
-        {
-            int index = rng.Next(candidates.Count);
-            picked.Add(candidates[index]);
-            candidates.RemoveAt(index);
-        }
-
-        return picked;
-    }
-
-    /// <summary>All instances: marks the given cells as event tiles with the existing indicator.</summary>
-    public void ApplyEventCells(BoardManager board, IEnumerable<Vector2Int> cells)
-    {
-        eventTiles.Clear();
-
-        foreach (Vector2Int cell in cells)
-        {
-            Tile tile = board.GetTile(cell);
-
-            if (tile == null)
-            {
-                Debug.LogError("EventManager: event cell " + cell + " does not exist on this board.");
-                continue;
-            }
-
-            EventTile eventTile = tile.GetComponent<EventTile>();
-
-            if (eventTile == null)
-                eventTile = tile.gameObject.AddComponent<EventTile>();
-
-            eventTile.hasEvent = true;
-            eventTile.ResetEvent();
-            CreateIndicator(eventTile);
-            eventTiles.Add(eventTile);
-        }
-
-        Debug.Log("EventManager: " + eventTiles.Count + " casillas de evento aplicadas (red).");
-    }
-
+    /// <summary>Active (not beaten, not yet triggered offline) event on this tile.</summary>
     public bool HasActiveEvent(Tile tile)
     {
         if (tile == null)
             return false;
 
         EventTile eventTile = tile.GetComponent<EventTile>();
-        return eventTile != null && eventTile.hasEvent;
+        return eventTile != null && eventTile.hasEvent && !eventTile.IsTriggered();
     }
 
     /// <summary>All instances: the event was beaten, hide its indicator and disable it.</summary>
@@ -204,18 +188,9 @@ public class EventManager : MonoBehaviour
             eventTile.indicator.SetActive(false);
     }
 
-    private bool IsCentralTile(Tile tile)
-    {
-        if (tile == null)
-            return false;
-
-        Transform parent = tile.transform.parent;
-
-        if (parent == null)
-            return false;
-
-        return parent.GetComponent<MapGenerator>() != null;
-    }
+    // =========================================================
+    // OFFLINE (comportamiento original)
+    // =========================================================
 
     public void CheckTile(Tile tile)
     {

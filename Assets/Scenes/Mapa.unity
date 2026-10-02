@@ -224,8 +224,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bf6dc8635a220484f9357d8b4dd7bf92, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapGenerator
-  width: 5
-  height: 5
+  width: 11
+  height: 11
   tilePrefab: {fileID: 5451176648331968537, guid: c8e43250d00969a4681423e99e9c835e, type: 3}
   tileSize: 2
   northConnection: 1
@@ -239,6 +239,8 @@ MonoBehaviour:
   eastRoomPrefab: {fileID: 648718039112685919, guid: bc1396864591eb04da03af705551debd, type: 3}
   westRoomPrefab: {fileID: 648718039112685919, guid: bc1396864591eb04da03af705551debd, type: 3}
   roomDistance: 0
+  autoFrameCamera: 1
+  cameraMargin: 1.25
   randomizeSeed: 1
   seed: 0
 --- !u!4 &238435667
@@ -1354,6 +1356,41 @@ MonoBehaviour:
         byte0123: 0
         byte0124: 0
         byte0125: 0
+  IsDuel:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: 0
+  DefenderPlayerId:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: -1
+  DefenderRoll:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: 0
+  DefenderModifier:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: 0
+  DefenderCardsUsed:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: 0
+  DefenderProtected:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: 0
+  DefenderLifeLoss:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: 0
 --- !u!114 &1564498935
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1605,10 +1642,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f6cfa92ee642d24479c2cc0f14a8ffad, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EventManager
-  eventTileCount: 5
+  eventTileCount: 12
+  eventsPerRoom: 4
   mapGenerator: {fileID: 238435666}
   eventIndicatorPrefab: {fileID: 3058239378606651601, guid: 19a2a61d10c257544adce5b74b0770a9, type: 3}
   eventIndicatorHeight: 0.5
+  eventIndicatorScale: 3
 --- !u!4 &1869856727
 Transform:
   m_ObjectHideFlags: 0

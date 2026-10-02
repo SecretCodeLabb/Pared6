@@ -5,14 +5,25 @@ using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// Event combat (T10) with card phase (T13). Host-authoritative:
-/// CardPhase -> Rolling -> Resolving -> Won/Lost -> back to TurnManager.
-/// resultado = tirada + modificador, compared with requerido (GameRules.requiredCombatRoll).
+/// Host-authoritative encounters.
+/// Event combat (T10/T13): CardPhase -> Rolling -> Resolving -> Won/Lost.
+///   resultado = tirada + modificador, compared with requerido (GameRules.requiredCombatRoll).
+/// Duel (two players on the same tile): both sides may play a card and roll their own die
+///   (same dice + card system); the higher result wins, the loser takes damage, draw = nothing.
+/// Then control returns to TurnManager.
 /// </summary>
 public class CombatManager : NetworkBehaviour
 {
     public static CombatManager Instance { get; private set; }
 
+    public enum Side
+    {
+        None,
+        Attacker,
+        Defender
+    }
+
+    // Shared / attacker side (the attacker is always the active player).
     public NetworkVariable<CombatPhase> Phase = new NetworkVariable<CombatPhase>(CombatPhase.None);
     public NetworkVariable<int> CombatPlayerId = new NetworkVariable<int>(TurnRotation.NoPlayer);
     public NetworkVariable<int> Roll = new NetworkVariable<int>(0);
@@ -23,10 +34,17 @@ public class CombatManager : NetworkBehaviour
     public NetworkVariable<int> LifeLoss = new NetworkVariable<int>(0);
     public NetworkVariable<FixedString128Bytes> LastCardText = new NetworkVariable<FixedString128Bytes>();
 
-    /// <summary>Raised on every instance when any combat value changes (for UI).</summary>
-    public event Action Changed;
+    // Duel only (defender side).
+    public NetworkVariable<bool> IsDuel = new NetworkVariable<bool>(false);
+    public NetworkVariable<int> DefenderPlayerId = new NetworkVariable<int>(TurnRotation.NoPlayer);
+    public NetworkVariable<int> DefenderRoll = new NetworkVariable<int>(0);
+    public NetworkVariable<int> DefenderModifier = new NetworkVariable<int>(0);
+    public NetworkVariable<int> DefenderCardsUsed = new NetworkVariable<int>(0);
+    public NetworkVariable<bool> DefenderProtected = new NetworkVariable<bool>(false);
+    public NetworkVariable<int> DefenderLifeLoss = new NetworkVariable<int>(0);
 
     private CombatContext context;
+    private CombatContext defenderContext;
     private Vector2Int eventCell;
     private Coroutine finishRoutine;
 
@@ -40,67 +58,75 @@ public class CombatManager : NetworkBehaviour
     public override void OnNetworkSpawn()
     {
         Instance = this;
-
-        Phase.OnValueChanged += OnPhaseChanged;
-        CombatPlayerId.OnValueChanged += OnIntChanged;
-        Roll.OnValueChanged += OnIntChanged;
-        RollModifier.OnValueChanged += OnIntChanged;
-        Required.OnValueChanged += OnIntChanged;
-        CardsUsed.OnValueChanged += OnIntChanged;
-        LifeLoss.OnValueChanged += OnIntChanged;
-        LifeProtected.OnValueChanged += OnBoolChanged;
-        LastCardText.OnValueChanged += OnTextChanged;
     }
 
     public override void OnNetworkDespawn()
     {
-        Phase.OnValueChanged -= OnPhaseChanged;
-        CombatPlayerId.OnValueChanged -= OnIntChanged;
-        Roll.OnValueChanged -= OnIntChanged;
-        RollModifier.OnValueChanged -= OnIntChanged;
-        Required.OnValueChanged -= OnIntChanged;
-        CardsUsed.OnValueChanged -= OnIntChanged;
-        LifeLoss.OnValueChanged -= OnIntChanged;
-        LifeProtected.OnValueChanged -= OnBoolChanged;
-        LastCardText.OnValueChanged -= OnTextChanged;
-
         if (Instance == this)
             Instance = null;
     }
 
-    private void OnPhaseChanged(CombatPhase previous, CombatPhase current) => Changed?.Invoke();
-    private void OnIntChanged(int previous, int current) => Changed?.Invoke();
-    private void OnBoolChanged(bool previous, bool current) => Changed?.Invoke();
-    private void OnTextChanged(FixedString128Bytes previous, FixedString128Bytes current) => Changed?.Invoke();
-
     // =========================================================
-    // LOCAL QUERIES
+    // LOCAL QUERIES (UI / input)
     // =========================================================
 
     public bool IsActive => Phase.Value != CombatPhase.None;
 
-    public bool IsLocalFighter
+    public bool IsDuelParticipant(int playerId)
+    {
+        return IsActive && IsDuel.Value &&
+               (playerId == CombatPlayerId.Value || playerId == DefenderPlayerId.Value);
+    }
+
+    /// <summary>Which side the local player fights on in the current encounter.</summary>
+    public Side LocalSide
     {
         get
         {
             PlayerNetworkData local = PlayerNetworkData.Local;
-            return local != null && local.IsAlive && local.PlayerId.Value == CombatPlayerId.Value;
+
+            if (!IsActive || local == null || !local.IsAlive)
+                return Side.None;
+
+            if (local.PlayerId.Value == CombatPlayerId.Value)
+                return Side.Attacker;
+
+            if (IsDuel.Value && local.PlayerId.Value == DefenderPlayerId.Value)
+                return Side.Defender;
+
+            return Side.None;
         }
     }
 
+    public bool IsLocalFighter => LocalSide != Side.None;
+
+    public bool HasRolled(Side side) => side == Side.Defender ? DefenderRoll.Value > 0 : Roll.Value > 0;
+
+    private int CardsUsedBy(Side side) => side == Side.Defender ? DefenderCardsUsed.Value : CardsUsed.Value;
+
     public bool CanLocalUseCard()
     {
+        Side side = LocalSide;
         PlayerNetworkData local = PlayerNetworkData.Local;
 
-        return IsLocalFighter &&
+        return side != Side.None &&
                Phase.Value == CombatPhase.CardPhase &&
-               CardsUsed.Value < Rules.maxCardsPerCombat &&
+               !HasRolled(side) &&
+               CardsUsedBy(side) < Rules.maxCardsPerCombat &&
                local.Hand.Count > 0;
     }
 
-    public bool CanLocalSkipCards() => IsLocalFighter && Phase.Value == CombatPhase.CardPhase;
+    public bool CanLocalSkipCards() => !IsDuel.Value && LocalSide == Side.Attacker && Phase.Value == CombatPhase.CardPhase;
 
-    public bool CanLocalRoll() => IsLocalFighter && (Phase.Value == CombatPhase.CardPhase || Phase.Value == CombatPhase.Rolling);
+    public bool CanLocalRoll()
+    {
+        Side side = LocalSide;
+
+        if (side == Side.None || HasRolled(side))
+            return false;
+
+        return Phase.Value == CombatPhase.CardPhase || Phase.Value == CombatPhase.Rolling;
+    }
 
     // =========================================================
     // SERVER: START / ABORT
@@ -111,24 +137,52 @@ public class CombatManager : NetworkBehaviour
         if (!IsServer)
             return;
 
-        StopFinish();
-
-        context = new CombatContext(player.PlayerId.Value, Rules.requiredCombatRoll, Rules.damageOnFail);
+        ResetState(player, false);
         eventCell = cell;
-
-        CombatPlayerId.Value = player.PlayerId.Value;
-        LastCardText.Value = "";
-        LifeLoss.Value = 0;
-        SyncContext();
 
         bool canUseCards = Rules.maxCardsPerCombat > 0 && player.Hand.Count > 0;
         Phase.Value = canUseCards ? CombatPhase.CardPhase : CombatPhase.Rolling;
 
-        AnnounceEventRpc(player.Name);
+        AnnounceRpc("¡EVENTO!\n<size=70%>¡TE HAS ENCONTRADO CON UNA AMENAZA!</size>\n<size=55%>" + player.Name + "</size>");
         Debug.Log($"{NetworkConnectionManager.GetInstanceTag()} ¡EVENTO! {player.Name} combate en {cell} (requerido {context.Required})");
     }
 
-    /// <summary>Host only: cancels the current combat without applying a result.</summary>
+    public void ServerBeginDuel(PlayerNetworkData attacker, PlayerNetworkData defender)
+    {
+        if (!IsServer)
+            return;
+
+        ResetState(attacker, true);
+
+        defenderContext = new CombatContext(defender.PlayerId.Value, 0, Rules.damageOnFail);
+        DefenderPlayerId.Value = defender.PlayerId.Value;
+        SyncContext();
+
+        // Cards (if any) can be played until each side rolls.
+        Phase.Value = CombatPhase.CardPhase;
+
+        AnnounceRpc("¡DUELO!\n<size=70%>" + attacker.Name + " contra " + defender.Name + "</size>");
+        GameStateManager.Instance.ServerBroadcast($"¡DUELO! {attacker.Name} contra {defender.Name}");
+        Debug.Log($"{NetworkConnectionManager.GetInstanceTag()} ¡DUELO! {attacker.Name} vs {defender.Name}");
+    }
+
+    private void ResetState(PlayerNetworkData attacker, bool duel)
+    {
+        StopFinish();
+
+        context = new CombatContext(attacker.PlayerId.Value, duel ? 0 : Rules.requiredCombatRoll, Rules.damageOnFail);
+        defenderContext = null;
+
+        IsDuel.Value = duel;
+        CombatPlayerId.Value = attacker.PlayerId.Value;
+        DefenderPlayerId.Value = TurnRotation.NoPlayer;
+        LastCardText.Value = "";
+        LifeLoss.Value = 0;
+        DefenderLifeLoss.Value = 0;
+        SyncContext();
+    }
+
+    /// <summary>Host only: cancels the current encounter without applying a result.</summary>
     public void ServerAbort()
     {
         if (!IsServer)
@@ -136,18 +190,20 @@ public class CombatManager : NetworkBehaviour
 
         StopFinish();
         context = null;
+        defenderContext = null;
+        IsDuel.Value = false;
         Phase.Value = CombatPhase.None;
     }
 
     [Rpc(SendTo.ClientsAndHost)]
-    private void AnnounceEventRpc(string playerName)
+    private void AnnounceRpc(string text)
     {
         if (EventUI.Instance != null)
-            EventUI.Instance.ShowMessage("¡EVENTO!\n<size=70%>¡TE HAS ENCONTRADO CON UNA AMENAZA!</size>\n<size=55%>" + playerName + "</size>", 2.5f);
+            EventUI.Instance.ShowMessage(text, 2.5f);
     }
 
     // =========================================================
-    // CARD PHASE (T13)
+    // CARDS (T13) — attacker, or either side in a duel
     // =========================================================
 
     public void RequestUseCardFromLocal(int handIndex, int cardId)
@@ -171,16 +227,18 @@ public class CombatManager : NetworkBehaviour
     [Rpc(SendTo.Server)]
     private void RequestUseCardRpc(int handIndex, int cardId, RpcParams rpcParams = default)
     {
-        if (!ValidateFighter(rpcParams.Receive.SenderClientId, out PlayerNetworkData player, "UseCard"))
+        if (!ValidateParticipant(rpcParams.Receive.SenderClientId, out PlayerNetworkData player, out Side side, "UseCard"))
             return;
 
-        if (Phase.Value != CombatPhase.CardPhase)
+        CombatContext sideContext = side == Side.Defender ? defenderContext : context;
+
+        if (Phase.Value != CombatPhase.CardPhase || sideContext.Roll > 0)
         {
-            Debug.LogWarning($"Combat: UseCard rejected, phase is {Phase.Value}.");
+            Debug.LogWarning($"Combat: UseCard rejected, phase is {Phase.Value} or {player.Name} already rolled.");
             return;
         }
 
-        if (context.CardsUsed >= Rules.maxCardsPerCombat)
+        if (sideContext.CardsUsed >= Rules.maxCardsPerCombat)
         {
             Debug.LogWarning("Combat: UseCard rejected, maxCardsPerCombat reached.");
             return;
@@ -202,25 +260,25 @@ public class CombatManager : NetworkBehaviour
         }
 
         player.ServerRemoveCardAt(handIndex);
-        card.Apply(context);
-        context.CardsUsed++;
-        context.AppliedCards.Add(card.displayName);
+        card.Apply(sideContext);
+        sideContext.CardsUsed++;
+        sideContext.AppliedCards.Add(card.displayName);
 
         LastCardText.Value = $"{player.Name} usó {card.displayName}";
         SyncContext();
         GameStateManager.Instance.ServerBroadcast($"{player.Name} usó {card.displayName}");
 
-        if (context.CardsUsed >= Rules.maxCardsPerCombat)
+        if (!IsDuel.Value && context.CardsUsed >= Rules.maxCardsPerCombat)
             Phase.Value = CombatPhase.Rolling;
     }
 
     [Rpc(SendTo.Server)]
     private void RequestSkipCardsRpc(RpcParams rpcParams = default)
     {
-        if (!ValidateFighter(rpcParams.Receive.SenderClientId, out PlayerNetworkData player, "SkipCards"))
+        if (!ValidateParticipant(rpcParams.Receive.SenderClientId, out PlayerNetworkData player, out Side side, "SkipCards"))
             return;
 
-        if (Phase.Value != CombatPhase.CardPhase)
+        if (IsDuel.Value || side != Side.Attacker || Phase.Value != CombatPhase.CardPhase)
             return;
 
         LastCardText.Value = $"{player.Name} no usa carta";
@@ -228,26 +286,26 @@ public class CombatManager : NetworkBehaviour
     }
 
     // =========================================================
-    // ROLL + RESOLVE (T10)
+    // ROLL + RESOLVE
     // =========================================================
 
     [Rpc(SendTo.Server)]
     private void RequestCombatRollRpc(RpcParams rpcParams = default)
     {
-        if (!ValidateFighter(rpcParams.Receive.SenderClientId, out PlayerNetworkData player, "CombatRoll"))
+        if (!ValidateParticipant(rpcParams.Receive.SenderClientId, out PlayerNetworkData player, out Side side, "CombatRoll"))
             return;
 
-        // Duplicate rolls fail here because the phase already moved to Resolving.
+        // Duplicate rolls fail here: the phase moved on or this side already rolled.
         if (Phase.Value != CombatPhase.CardPhase && Phase.Value != CombatPhase.Rolling)
         {
             Debug.LogWarning($"Combat: roll rejected, phase is {Phase.Value}.");
             return;
         }
 
-        ServerResolve(player);
+        ServerRollFor(side);
     }
 
-    /// <summary>Host only (timeout): rolls for the active fighter.</summary>
+    /// <summary>Host only (timeout): rolls for every side that has not rolled yet.</summary>
     public void ServerForceRoll()
     {
         if (!IsServer || context == null)
@@ -256,19 +314,42 @@ public class CombatManager : NetworkBehaviour
         if (Phase.Value != CombatPhase.CardPhase && Phase.Value != CombatPhase.Rolling)
             return;
 
-        PlayerNetworkData player = PlayerNetworkData.GetByPlayerId(CombatPlayerId.Value);
+        if (context.Roll == 0)
+            ServerRollFor(Side.Attacker);
 
-        if (player != null)
-            ServerResolve(player);
+        if (IsDuel.Value && defenderContext != null && defenderContext.Roll == 0 && Phase.Value != CombatPhase.None)
+            ServerRollFor(Side.Defender);
     }
 
-    private void ServerResolve(PlayerNetworkData player)
+    private void ServerRollFor(Side side)
     {
+        CombatContext sideContext = side == Side.Defender ? defenderContext : context;
+
+        if (sideContext == null || sideContext.Roll > 0)
+        {
+            Debug.LogWarning($"Combat: {side} already rolled.");
+            return;
+        }
+
+        sideContext.Roll = UnityEngine.Random.Range(Rules.diceMin, Rules.diceMax + 1);
+        SyncContext();
+
+        if (!IsDuel.Value)
+        {
+            ServerResolveEvent();
+            return;
+        }
+
+        if (context.Roll > 0 && defenderContext.Roll > 0)
+            ServerResolveDuel();
+    }
+
+    private void ServerResolveEvent()
+    {
+        PlayerNetworkData player = PlayerNetworkData.GetByPlayerId(CombatPlayerId.Value);
         Phase.Value = CombatPhase.Resolving;
 
-        context.Roll = UnityEngine.Random.Range(Rules.diceMin, Rules.diceMax + 1);
         CombatOutcome outcome = CombatResolver.Resolve(context);
-        SyncContext();
         LifeLoss.Value = outcome.LifeLoss;
 
         if (outcome.Won)
@@ -282,16 +363,44 @@ public class CombatManager : NetworkBehaviour
         }
         else
         {
-            player.Lives.Value = Mathf.Max(0, player.Lives.Value - outcome.LifeLoss);
+            ApplyDamage(player, outcome.LifeLoss);
             Phase.Value = CombatPhase.Lost;
-
-            if (player.Lives.Value <= 0)
-                GameStateManager.Instance.ServerEliminate(player);
         }
 
         Debug.Log($"{NetworkConnectionManager.GetInstanceTag()} Combate {player.Name}: {context.Roll} + {context.RollModifier} = {context.Result} vs {context.Required} -> {(outcome.Won ? "SUPERADO" : "FALLADO")} (vidas -{outcome.LifeLoss})");
 
         finishRoutine = StartCoroutine(FinishAfterDelay());
+    }
+
+    private void ServerResolveDuel()
+    {
+        PlayerNetworkData attacker = PlayerNetworkData.GetByPlayerId(CombatPlayerId.Value);
+        PlayerNetworkData defender = PlayerNetworkData.GetByPlayerId(DefenderPlayerId.Value);
+        Phase.Value = CombatPhase.Resolving;
+
+        DuelOutcome outcome = DuelResolver.Resolve(context, defenderContext);
+        LifeLoss.Value = outcome.AttackerLifeLoss;
+        DefenderLifeLoss.Value = outcome.DefenderLifeLoss;
+
+        ApplyDamage(attacker, outcome.AttackerLifeLoss);
+        ApplyDamage(defender, outcome.DefenderLifeLoss);
+
+        Phase.Value = outcome.Winner > 0 ? CombatPhase.Won : outcome.Winner < 0 ? CombatPhase.Lost : CombatPhase.Draw;
+
+        Debug.Log($"{NetworkConnectionManager.GetInstanceTag()} Duelo {attacker.Name} {context.Result} vs {defender.Name} {defenderContext.Result} -> {Phase.Value}");
+
+        finishRoutine = StartCoroutine(FinishAfterDelay());
+    }
+
+    private static void ApplyDamage(PlayerNetworkData player, int amount)
+    {
+        if (player == null || amount <= 0)
+            return;
+
+        player.Lives.Value = Mathf.Max(0, player.Lives.Value - amount);
+
+        if (player.Lives.Value <= 0)
+            GameStateManager.Instance.ServerEliminate(player);
     }
 
     private IEnumerator FinishAfterDelay()
@@ -300,6 +409,8 @@ public class CombatManager : NetworkBehaviour
         finishRoutine = null;
 
         context = null;
+        defenderContext = null;
+        IsDuel.Value = false;
         Phase.Value = CombatPhase.None;
         TurnManager.Instance.ServerEndTurn();
     }
@@ -308,14 +419,26 @@ public class CombatManager : NetworkBehaviour
     // HELPERS
     // =========================================================
 
-    private bool ValidateFighter(ulong sender, out PlayerNetworkData player, string action)
+    /// <summary>Sender must be Alive and be the attacker (active player) or, in a duel, the defender.</summary>
+    private bool ValidateParticipant(ulong sender, out PlayerNetworkData player, out Side side, string action)
     {
-        if (!TurnManager.Instance.ValidateActivePlayer(sender, TurnState.Combat, out player, action))
-            return false;
+        side = Side.None;
+        player = PlayerNetworkData.GetByClientId(sender);
 
-        if (context == null || player.PlayerId.Value != CombatPlayerId.Value)
+        if (player == null || !player.IsAlive || context == null || TurnManager.Instance.State.Value != TurnState.Combat)
         {
-            Debug.LogWarning($"Combat: {action} rejected, no combat for this player.");
+            Debug.LogWarning($"Combat: {action} rejected, no active encounter for client {sender}.");
+            return false;
+        }
+
+        if (player.PlayerId.Value == CombatPlayerId.Value && player.PlayerId.Value == TurnManager.Instance.CurrentPlayerId.Value)
+            side = Side.Attacker;
+        else if (IsDuel.Value && player.PlayerId.Value == DefenderPlayerId.Value)
+            side = Side.Defender;
+
+        if (side == Side.None)
+        {
+            Debug.LogWarning($"Combat: {action} rejected, {player.Name} is not in this encounter.");
             return false;
         }
 
@@ -328,7 +451,22 @@ public class CombatManager : NetworkBehaviour
         RollModifier.Value = context.RollModifier;
         Required.Value = context.Required;
         CardsUsed.Value = context.CardsUsed;
-        LifeProtected.Value = context.PreventLifeLoss || context.DamageReduction >= context.DamageOnFail;
+        LifeProtected.Value = context.DamageIfDefeated == 0;
+
+        if (defenderContext != null)
+        {
+            DefenderRoll.Value = defenderContext.Roll;
+            DefenderModifier.Value = defenderContext.RollModifier;
+            DefenderCardsUsed.Value = defenderContext.CardsUsed;
+            DefenderProtected.Value = defenderContext.DamageIfDefeated == 0;
+        }
+        else
+        {
+            DefenderRoll.Value = 0;
+            DefenderModifier.Value = 0;
+            DefenderCardsUsed.Value = 0;
+            DefenderProtected.Value = false;
+        }
     }
 
     private void StopFinish()

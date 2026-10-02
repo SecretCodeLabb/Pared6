@@ -243,3 +243,164 @@ public class CardDealTests
         Assert.AreEqual(2, CardDatabase.DealHand(new List<int> { 1, 2 }, 3, false, new System.Random(7)).Count);
     }
 }
+
+public class BoardLayoutTests
+{
+    private static BoardLayout.Settings Settings(int center = 11, int room = 7) => new BoardLayout.Settings
+    {
+        centerWidth = center,
+        centerHeight = center,
+        centerExtraPathChance = 0.35f,
+        roomWidth = room,
+        roomDepth = room,
+        roomExtraPathChance = 0.35f,
+        north = true,
+        south = true,
+        east = true,
+        west = true
+    };
+
+    [TestCase(11, 7)]
+    [TestCase(8, 5)]
+    [TestCase(9, 6)]
+    public void SizesAreRespected(int center, int room)
+    {
+        BoardLayout layout = BoardLayout.Generate(Settings(center, room), 1);
+        Assert.AreEqual(center * center, layout.CellsIn(BoardRegion.Center).Count);
+
+        foreach (BoardRegion r in new[] { BoardRegion.North, BoardRegion.South, BoardRegion.East, BoardRegion.West })
+            Assert.AreEqual(room * room, layout.CellsIn(r).Count, r.ToString());
+
+        Assert.AreEqual(center * center + 4 * room * room, layout.Cells.Count);
+    }
+
+    [Test]
+    public void SameSeedSameBoard()
+    {
+        BoardLayout a = BoardLayout.Generate(Settings(), 12345);
+        BoardLayout b = BoardLayout.Generate(Settings(), 12345);
+
+        foreach (Vector2Int cell in a.Cells)
+            Assert.AreEqual(a.WallMask(cell), b.WallMask(cell));
+    }
+
+    [Test]
+    public void DifferentSeedsDiffer()
+    {
+        BoardLayout a = BoardLayout.Generate(Settings(), 1);
+        BoardLayout b = BoardLayout.Generate(Settings(), 2);
+        int differences = 0;
+
+        foreach (Vector2Int cell in a.Cells)
+            if (a.WallMask(cell) != b.WallMask(cell)) differences++;
+
+        Assert.Greater(differences, 0);
+    }
+
+    [TestCase(11, 7)]
+    [TestCase(8, 5)]
+    [TestCase(9, 6)]
+    public void WallsAgreeOnBothSidesAndEverythingIsReachable(int center, int room)
+    {
+        for (int seed = 0; seed < 200; seed++)
+        {
+            BoardLayout layout = BoardLayout.Generate(Settings(center, room), seed);
+            Assert.AreEqual(0, layout.CountAsymmetricWalls(), "seed " + seed);
+
+            Vector2Int start = new Vector2Int(center / 2, center / 2);
+            Assert.AreEqual(layout.Cells.Count, layout.Reachable(start).Count, "seed " + seed);
+        }
+    }
+
+    [Test]
+    public void BorderIsClosedAndEachRoomHasExactlyOneDoor()
+    {
+        for (int seed = 0; seed < 50; seed++)
+        {
+            BoardLayout layout = BoardLayout.Generate(Settings(), seed);
+            Dictionary<BoardRegion, int> doors = new Dictionary<BoardRegion, int>();
+
+            foreach (Vector2Int cell in layout.Cells)
+            {
+                foreach (Vector2Int d in BoardLayout.Directions)
+                {
+                    Vector2Int next = cell + d;
+
+                    if (!layout.Contains(next))
+                    {
+                        Assert.IsTrue(layout.HasWall(cell, d), $"open border at {cell} {d} seed {seed}");
+                        continue;
+                    }
+
+                    BoardRegion a = layout.RegionOf(cell);
+                    BoardRegion b = layout.RegionOf(next);
+
+                    if (a == BoardRegion.Center && b != BoardRegion.Center && layout.CanMove(cell, d))
+                        doors[b] = doors.TryGetValue(b, out int n) ? n + 1 : 1;
+
+                    if (a != BoardRegion.Center && b != BoardRegion.Center && a != b)
+                        Assert.IsFalse(layout.CanMove(cell, d), "rooms must not connect to each other");
+                }
+            }
+
+            foreach (BoardRegion r in new[] { BoardRegion.North, BoardRegion.South, BoardRegion.East, BoardRegion.West })
+                Assert.AreEqual(1, doors[r], $"{r} seed {seed}");
+        }
+    }
+
+    [Test]
+    public void RoomEntranceLinesUpWithCentralExit()
+    {
+        BoardLayout layout = BoardLayout.Generate(Settings(), 3);
+        Assert.AreEqual(new Vector2Int(5, 11), layout.Entrances[BoardRegion.North]);
+        Assert.AreEqual(new Vector2Int(5, -1), layout.Entrances[BoardRegion.South]);
+        Assert.AreEqual(new Vector2Int(11, 5), layout.Entrances[BoardRegion.East]);
+        Assert.AreEqual(new Vector2Int(-1, 5), layout.Entrances[BoardRegion.West]);
+        Assert.IsTrue(layout.CanMove(new Vector2Int(5, 10), Vector2Int.up));
+    }
+}
+
+public class DuelTests
+{
+    [Test]
+    public void HigherResultWinsAndLoserTakesDamage()
+    {
+        var attacker = new CombatContext(0, 0, 1) { Roll = 5 };
+        var defender = new CombatContext(1, 0, 1) { Roll = 3 };
+        DuelOutcome outcome = DuelResolver.Resolve(attacker, defender);
+        Assert.AreEqual(1, outcome.Winner);
+        Assert.AreEqual(0, outcome.AttackerLifeLoss);
+        Assert.AreEqual(1, outcome.DefenderLifeLoss);
+    }
+
+    [Test]
+    public void CardsChangeTheDuel()
+    {
+        var attacker = new CombatContext(0, 0, 1) { Roll = 3 };
+        var defender = new CombatContext(1, 0, 1) { Roll = 4 };
+        attacker.RollModifier += 2;
+        DuelOutcome outcome = DuelResolver.Resolve(attacker, defender);
+        Assert.AreEqual(1, outcome.Winner);
+    }
+
+    [Test]
+    public void DefenceCardProtectsLoser()
+    {
+        var attacker = new CombatContext(0, 0, 1) { Roll = 2 };
+        var defender = new CombatContext(1, 0, 1) { Roll = 6, };
+        attacker.DamageReduction = 1;
+        DuelOutcome outcome = DuelResolver.Resolve(attacker, defender);
+        Assert.AreEqual(-1, outcome.Winner);
+        Assert.AreEqual(0, outcome.AttackerLifeLoss);
+    }
+
+    [Test]
+    public void DrawHurtsNobody()
+    {
+        var attacker = new CombatContext(0, 0, 1) { Roll = 4 };
+        var defender = new CombatContext(1, 0, 1) { Roll = 4 };
+        DuelOutcome outcome = DuelResolver.Resolve(attacker, defender);
+        Assert.AreEqual(0, outcome.Winner);
+        Assert.AreEqual(0, outcome.AttackerLifeLoss + outcome.DefenderLifeLoss);
+    }
+}

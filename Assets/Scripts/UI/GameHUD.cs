@@ -218,12 +218,12 @@ public class GameHUD : MonoBehaviour
         UIFactory.Place(panel.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 60f), new Vector2(760f, 430f));
         combatPanel = panel.gameObject;
 
-        combatTitle = UIFactory.CreateText(panel.transform, "Title", "¡TE HAS ENCONTRADO CON UNA AMENAZA!", 30f);
+        combatTitle = UIFactory.CreateText(panel.transform, "Title", "", 30f);
         UIFactory.Place(combatTitle.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -12f), new Vector2(730f, 44f));
         combatTitle.color = new Color(1f, 0.45f, 0.35f);
 
         combatBody = UIFactory.CreateText(panel.transform, "Body", "", 24f);
-        UIFactory.Place(combatBody.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -62f), new Vector2(730f, 150f));
+        UIFactory.Place(combatBody.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -58f), new Vector2(730f, 170f));
 
         combatResult = UIFactory.CreateText(panel.transform, "Result", "", 40f);
         UIFactory.Place(combatResult.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -214f), new Vector2(730f, 60f));
@@ -333,7 +333,7 @@ public class GameHUD : MonoBehaviour
             case TurnState.WaitingForRoll: hint = turns.IsLocalPlayersTurn ? "Pulsa TIRAR DADO" : "Esperando la tirada"; break;
             case TurnState.Moving: hint = turns.IsLocalPlayersTurn ? $"Muévete con WASD / flechas · {turns.MovesRemaining.Value} restantes" : $"Moviéndose · {turns.MovesRemaining.Value} restantes"; break;
             case TurnState.CheckingTile: hint = "Comprobando casilla..."; break;
-            case TurnState.Combat: hint = "¡Combate en curso!"; break;
+            case TurnState.Combat: hint = CombatManager.Instance != null && CombatManager.Instance.IsDuel.Value ? "¡Duelo en curso!" : "¡Combate en curso!"; break;
             case TurnState.TurnEnd: hint = "Fin del turno"; break;
             case TurnState.GameOver: hint = "Partida terminada"; break;
             default: hint = ""; break;
@@ -512,6 +512,27 @@ public class GameHUD : MonoBehaviour
 
         combatPanel.SetActive(true);
 
+        if (combat.IsDuel.Value)
+            RefreshDuel(combat);
+        else
+            RefreshEventCombat(combat);
+
+        CombatManager.Side side = combat.LocalSide;
+        bool isFighter = side != CombatManager.Side.None;
+
+        useCardButton.interactable = combat.CanLocalUseCard() && selectedHandIndex >= 0;
+        skipCardButton.interactable = combat.CanLocalSkipCards();
+        combatRollButton.interactable = combat.CanLocalRoll();
+
+        useCardButton.gameObject.SetActive(isFighter);
+        skipCardButton.gameObject.SetActive(isFighter && !combat.IsDuel.Value);
+        combatRollButton.gameObject.SetActive(isFighter);
+    }
+
+    private void RefreshEventCombat(CombatManager combat)
+    {
+        combatTitle.text = "¡TE HAS ENCONTRADO CON UNA AMENAZA!";
+
         PlayerNetworkData fighter = PlayerNetworkData.GetByPlayerId(combat.CombatPlayerId.Value);
         string fighterName = fighter != null ? fighter.Name : "?";
         bool isLocal = combat.IsLocalFighter;
@@ -523,23 +544,14 @@ public class GameHUD : MonoBehaviour
         if (combat.LifeProtected.Value)
             body.Append("\n<color=#80C0FF>Protegido: no perderá vida si falla</color>");
 
-        string lastCard = combat.LastCardText.Value.ToString();
-
-        if (!string.IsNullOrEmpty(lastCard))
-            body.Append($"\n<color=#C0FFC0>{lastCard}</color>");
+        AppendLastCard(body, combat);
 
         CombatPhase phase = combat.Phase.Value;
-        string bonus = combat.RollModifier.Value >= 0 ? "+ " + combat.RollModifier.Value : "- " + (-combat.RollModifier.Value);
 
         if (phase == CombatPhase.Won || phase == CombatPhase.Lost || phase == CombatPhase.Resolving)
-        {
-            int result = combat.Roll.Value + combat.RollModifier.Value;
-            body.Append($"\nTirada {combat.Roll.Value} {bonus} = <b>{result}</b> vs {combat.Required.Value}");
-        }
+            body.Append($"\nTirada {RollText(combat.Roll.Value, combat.RollModifier.Value)} vs {combat.Required.Value}");
         else if (combat.RollModifier.Value != 0)
-        {
-            body.Append($"\nBonus a la tirada: {bonus}");
-        }
+            body.Append($"\nBonus a la tirada: {Signed(combat.RollModifier.Value)}");
 
         combatBody.text = body.ToString();
 
@@ -563,15 +575,82 @@ public class GameHUD : MonoBehaviour
                 combatResult.text = "";
                 break;
         }
+    }
 
-        bool canUse = combat.CanLocalUseCard() && selectedHandIndex >= 0;
-        useCardButton.interactable = canUse;
-        skipCardButton.interactable = combat.CanLocalSkipCards();
-        combatRollButton.interactable = combat.CanLocalRoll();
+    private void RefreshDuel(CombatManager combat)
+    {
+        combatTitle.text = "¡DUELO!";
 
-        useCardButton.gameObject.SetActive(isLocal);
-        skipCardButton.gameObject.SetActive(isLocal);
-        combatRollButton.gameObject.SetActive(isLocal);
+        PlayerNetworkData attacker = PlayerNetworkData.GetByPlayerId(combat.CombatPlayerId.Value);
+        PlayerNetworkData defender = PlayerNetworkData.GetByPlayerId(combat.DefenderPlayerId.Value);
+        CombatManager.Side side = combat.LocalSide;
+
+        StringBuilder body = new StringBuilder();
+
+        if (side != CombatManager.Side.None)
+            body.Append("<color=#FFD040>¡Estás en un duelo! Usa una carta si quieres y tira tu dado.</color>\n");
+        else
+            body.Append("Mayor resultado gana · el perdedor pierde una vida\n");
+
+        body.Append(DuelLine(attacker, combat.Roll.Value, combat.RollModifier.Value, combat.LifeProtected.Value));
+        body.Append("\n<size=80%>contra</size>\n");
+        body.Append(DuelLine(defender, combat.DefenderRoll.Value, combat.DefenderModifier.Value, combat.DefenderProtected.Value));
+        AppendLastCard(body, combat);
+        combatBody.text = body.ToString();
+
+        string attackerName = attacker != null ? attacker.Name : "?";
+        string defenderName = defender != null ? defender.Name : "?";
+
+        switch (combat.Phase.Value)
+        {
+            case CombatPhase.Won:
+                combatResult.text = $"<color=#60FF60>¡GANA {attackerName}!</color>" + LossText(defenderName, combat.DefenderLifeLoss.Value);
+                break;
+            case CombatPhase.Lost:
+                combatResult.text = $"<color=#60FF60>¡GANA {defenderName}!</color>" + LossText(attackerName, combat.LifeLoss.Value);
+                break;
+            case CombatPhase.Draw:
+                combatResult.text = "<color=#FFD040>¡EMPATE!</color> <size=60%>nadie pierde vida</size>";
+                break;
+            default:
+                combatResult.text = side != CombatManager.Side.None && combat.HasRolled(side)
+                    ? "<size=70%>Esperando la tirada del rival...</size>"
+                    : "";
+                break;
+        }
+    }
+
+    private static string DuelLine(PlayerNetworkData p, int roll, int modifier, bool protectedFromDamage)
+    {
+        string name = p != null ? p.Name : "?";
+        string rollText = roll > 0 ? RollText(roll, modifier) : (modifier != 0 ? $"sin tirar (bonus {Signed(modifier)})" : "sin tirar");
+        string shield = protectedFromDamage ? " <color=#80C0FF>(protegido)</color>" : "";
+        return $"<b>{name}</b>: {rollText}{shield}";
+    }
+
+    private static string LossText(string loserName, int lifeLoss)
+    {
+        return lifeLoss > 0
+            ? $" <size=60%>{loserName} -{lifeLoss} {Heart}</size>"
+            : $" <size=60%>{loserName} sin daño</size>";
+    }
+
+    private static string RollText(int roll, int modifier)
+    {
+        return $"{roll} {Signed(modifier)} = <b>{roll + modifier}</b>";
+    }
+
+    private static string Signed(int value)
+    {
+        return value >= 0 ? "+ " + value : "- " + (-value);
+    }
+
+    private static void AppendLastCard(StringBuilder body, CombatManager combat)
+    {
+        string lastCard = combat.LastCardText.Value.ToString();
+
+        if (!string.IsNullOrEmpty(lastCard))
+            body.Append($"\n<color=#C0FFC0>{lastCard}</color>");
     }
 
     private void RefreshEnd(TurnManager turns, GameStateManager game, PlayerNetworkData local)

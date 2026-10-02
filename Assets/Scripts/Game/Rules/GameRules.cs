@@ -29,6 +29,12 @@ public class GameRules : ScriptableObject
     [Header("Board")]
     [Range(1, 20)] public int eventTileCount = 5;
 
+    [Header("Encounters")]
+    [Tooltip("True: walking over an active event stops the movement and starts the combat. False: only when the movement ends on it.")]
+    public bool eventsTriggerWhenPassing = true;
+    [Tooltip("True: entering a tile with another Alive player stops the movement and starts a duel.")]
+    public bool duelsEnabled = true;
+
     [Header("Combat")]
     public int requiredCombatRoll = 4;
     [Min(0)] public int damageOnFail = 1;

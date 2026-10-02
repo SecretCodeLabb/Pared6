@@ -75,7 +75,7 @@ public class GameStateManager : NetworkBehaviour
             foreach (Tile tile in boardManager.GetStartingTiles(GameRules.Instance.maxPlayers))
                 excluded.Add(BoardManager.CellOf(tile));
 
-            foreach (Vector2Int cell in eventManager.PickEventCells(boardManager, eventRng, excluded))
+            foreach (Vector2Int cell in eventManager.PickEventCells(boardManager.GetAllTiles(), eventRng, excluded))
                 EventCells.Add(cell);
 
             ApplyEvents();
@@ -129,7 +129,7 @@ public class GameStateManager : NetworkBehaviour
         foreach (Vector2Int cell in EventCells)
             cells.Add(cell);
 
-        eventManager.ApplyEventCells(boardManager, cells);
+        eventManager.ApplyEventCells(boardManager.GetAllTiles(), cells);
         LocalBoardHash = boardManager.ComputeBoardHash(cells);
 
         Debug.Log($"{NetworkConnectionManager.GetInstanceTag()} Tablero generado. Seed: {BoardSeed.Value} · Eventos: {cells.Count} · Hash: {LocalBoardHash}");

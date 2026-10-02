@@ -258,11 +258,17 @@ public class PlayerController : MonoBehaviour
 
         isMoving = false;
 
-        // The event only triggers when the movement ENDS on the tile (T09),
-        // not when passing over it.
-        if (remainingMoves == 0 && EventManager.Instance != null)
+        // Offline: the event triggers when the movement ends on it, or when passing
+        // over it if GameRules.eventsTriggerWhenPassing (then the movement stops there).
+        bool triggers = remainingMoves == 0 || GameRules.Instance.eventsTriggerWhenPassing;
+
+        if (triggers && EventManager.Instance != null && EventManager.Instance.HasActiveEvent(currentTile))
         {
+            remainingMoves = 0;
             EventManager.Instance.CheckTile(currentTile);
+
+            if (boardManager != null)
+                boardManager.UpdateGameInfo();
         }
     }
 }

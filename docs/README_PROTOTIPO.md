@@ -23,7 +23,12 @@ En builds de desarrollo existe un bot de pruebas:
 3. **Partida (`Mapa`)**: el Host genera la semilla; todos construyen el mismo tablero (hash comprobado).
    - Tu turno: **TIRAR DADO** (1–6) y muévete casilla a casilla con **WASD / flechas** o los botones.
      Las paredes no se atraviesan.
-   - Si **terminas** el movimiento en una casilla de evento (cápsula morada): **combate**.
+   - Si **pasas por** (o terminas en) una casilla de evento activa (cápsula morada), el movimiento se
+     detiene ahí y empieza el **combate** (`GameRules.eventsTriggerWhenPassing`; en false solo al terminar).
+   - Si entras en una casilla con **otro jugador**, el movimiento se detiene y hay un **DUELO**
+     (`GameRules.duelsEnabled`): cada uno puede usar una carta y tira su dado; gana el mayor
+     resultado y el perdedor pierde 1 vida (las cartas de defensa le protegen); empate = nadie pierde.
+     El duelo tiene prioridad sobre un evento en la misma casilla.
      Puedes **USAR CARTA** (elige una de tu mano), **NO USAR CARTA** o **TIRAR DADO DE COMBATE**.
      `tirada + bonus ≥ requerido` → `¡SUPERASTE EL EVENTO!` (+1 progreso, el evento desaparece);
      si no → `FALLASTE EL EVENTO` (−1 vida, salvo carta de defensa).
@@ -49,7 +54,10 @@ Todos en **`Assets/Resources/GameRules.asset`** (Inspector):
 | `startingHandSize` / `allowDuplicateCards` | 3 / true | reparto inicial |
 | `requiredEventsToWin` | 3 | eventos para ganar |
 
-Número de casillas de evento: `EventManager.eventTileCount` en la escena `Mapa` (5).
+Eventos (escena `Mapa`, objeto `EventManager`): `eventTileCount` (tablero central, 12),
+`eventsPerRoom` (cada habitación, 4), `eventIndicatorScale` (tamaño del marcador, 3).
+Tablero (`MapGenerator`): `width`/`height` del centro; tamaño de las habitaciones = `RoomBuilder.width/height`
+del prefab `Room_01`; `autoFrameCamera` encuadra la cámara en todo el tablero.
 
 ## Cómo añadir una carta
 
@@ -92,9 +100,9 @@ Truco del oficio (Habilidad, sin efecto aún), Piedra brillante (Inútil).
 
 ## Limitaciones conocidas
 
-- Las habitaciones laterales no son accesibles: su entrada queda desplazada media casilla respecto a la
-  salida del tablero central (existía antes; no se tocó por la regla de no modificar paredes). Además
-  la lógica de paredes no tiene en cuenta la rotación de las habitaciones.
+- Tablero: un único grid alineado (centro + 4 habitaciones sin rotación) generado por `BoardLayout`
+  (`Scripts/Game/Rules`). Cada pared se guarda en las dos casillas que la comparten: lógica y visual
+  siempre coinciden (auditoría en tiempo de ejecución: 0 discrepancias; tests con 600 semillas).
 - Un cliente que se cierra a la fuerza tarda ~30 s (timeout de Unity Transport) en marcarse DESCONECTADO.
 - Las habilidades de personaje y las cartas de Habilidad/Inútil aún no tienen efecto.
 - Los peones son la cápsula existente teñida con el color del personaje (`CharacterData.boardColor`).

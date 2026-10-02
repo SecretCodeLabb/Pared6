@@ -1,6 +1,11 @@
-using System.Collections.Generic;
 using UnityEngine;
 
+/// <summary>
+/// Builds the board from a seed-deterministic BoardLayout: central board (width x height)
+/// plus side rooms (size/tile/path chance taken from each room prefab's RoomBuilder).
+/// All tiles share one world-aligned grid and no room is rotated, so a wall flag always
+/// matches the visible wall and both tiles of an edge agree.
+/// </summary>
 public class MapGenerator : MonoBehaviour
 {
     [Header("Map Size")]
@@ -30,13 +35,20 @@ public class MapGenerator : MonoBehaviour
     public GameObject westRoomPrefab;
 
     [Header("Room Placement")]
+    [Tooltip("Not used: rooms are attached directly to the board so their entrance lines up with the exit.")]
     public float roomDistance = 0f;
+
+    [Header("Camera")]
+    [Tooltip("Frame the main camera on the generated board (keeps its angle).")]
+    public bool autoFrameCamera = true;
+    [Min(1f)] public float cameraMargin = 1.25f;
 
     [Header("Seed")]
     public bool randomizeSeed = true;
     public int seed;
 
-    private Tile[,] tiles;
+    /// <summary>The logical layout of the last generated board.</summary>
+    public BoardLayout Layout { get; private set; }
 
     // Network mode: events are decided by the Host, not rolled here (T05).
     private bool generateEvents = true;
@@ -57,10 +69,7 @@ public class MapGenerator : MonoBehaviour
         GenerateMap();
     }
 
-    /// <summary>
-    /// Deterministic generation from an injected seed (T05). Same seed => same walls.
-    /// All randomness happens synchronously inside GenerateMap, so seeding the global RNG is enough.
-    /// </summary>
+    /// <summary>Deterministic generation from an injected seed (T05). Same seed => same board.</summary>
     public void GenerateWithSeed(int newSeed, bool includeEvents)
     {
         seed = newSeed;
@@ -77,490 +86,144 @@ public class MapGenerator : MonoBehaviour
 
         if (tilePrefab == null)
         {
-            Debug.LogError(
-                "MapGenerator: No hay Tile Prefab asignado." 
-            );
+            Debug.LogError("MapGenerator: No hay Tile Prefab asignado.");
             return;
         }
 
-        tiles = new Tile[width, height];
+        RoomBuilder roomTemplate = GetRoomTemplate();
 
-        CreateTiles();
-        CreateClosedMap();
-        CreateMainPaths();
-        CreateExtraPaths();
-        CreateOuterWalls();
-        CreateConnections();
-        UpdateTileVisuals();
-
-        if (generateRooms)
+        BoardLayout.Settings settings = new BoardLayout.Settings
         {
-            GenerateRooms();
-        }
+            centerWidth = width,
+            centerHeight = height,
+            centerExtraPathChance = extraPathChance,
+            roomWidth = roomTemplate != null ? roomTemplate.width : 5,
+            roomDepth = roomTemplate != null ? roomTemplate.height : 5,
+            roomExtraPathChance = roomTemplate != null ? roomTemplate.extraPathChance : extraPathChance,
+            north = generateRooms && northConnection && northRoomPrefab != null,
+            south = generateRooms && southConnection && southRoomPrefab != null,
+            east = generateRooms && eastConnection && eastRoomPrefab != null,
+            west = generateRooms && westConnection && westRoomPrefab != null
+        };
 
-        if (generateEvents && EventManager.Instance != null)
+        Layout = BoardLayout.Generate(settings, seed);
+
+        GameObject roomTilePrefab = roomTemplate != null && roomTemplate.tilePrefab != null
+            ? roomTemplate.tilePrefab
+            : tilePrefab;
+
+        Transform[] containers = new Transform[5];
+
+        foreach (Vector2Int cell in Layout.Cells)
         {
-            EventManager.Instance.GenerateEventTiles();
-        }
+            BoardRegion region = Layout.RegionOf(cell);
+            bool central = region == BoardRegion.Center;
+            Transform parent = central ? transform : GetContainer(containers, region);
 
-        Debug.Log("Mapa generado. Seed: " + seed);
-    }
-
-    private void CreateTiles()
-    {
-        for (int x = 0; x < width; x++)
-        {
-            for (int y = 0; y < height; y++)
-            {
-                Vector3 position = new Vector3(
-                    x * tileSize,
-                    0,
-                    y * tileSize
-                );
-
-                GameObject tileObject = Instantiate(
-                    tilePrefab,
-                    position,
-                    Quaternion.identity,
-                    transform
-                );
-
-                tileObject.name =
-                    "Central_Tile_" + x + "_" + y;
-
-                Tile tile =
-                    tileObject.GetComponent<Tile>();
-
-                if (tile == null)
-                {
-                    Debug.LogError(
-                        "MapGenerator: El Tile Prefab no tiene Tile.cs."
-                    );
-                    return;
-                }
-
-                tile.Initialize(
-                    new Vector2Int(x, y)
-                );
-
-                tile.walkable = true;
-
-                tiles[x, y] = tile;
-            }
-        }
-    }
-
-    private void CreateClosedMap()
-    {
-        for (int x = 0; x < width; x++)
-        {
-            for (int y = 0; y < height; y++)
-            {
-                Tile tile = tiles[x, y];
-
-                tile.northWall = true;
-                tile.southWall = true;
-                tile.eastWall = true;
-                tile.westWall = true;
-            }
-        }
-    }
-
-    private void CreateMainPaths()
-    {
-        int startX = width / 2;
-        int startY = height / 2;
-
-        bool[,] visited = new bool[width, height];
-
-        GenerateConnectedPaths(
-            startX,
-            startY,
-            visited
-        );
-    }
-
-    private void GenerateConnectedPaths(
-        int x,
-        int y,
-        bool[,] visited)
-    {
-        visited[x, y] = true;
-
-        List<Vector2Int> directions =
-            new List<Vector2Int>
-            {
-                Vector2Int.up,
-                Vector2Int.down,
-                Vector2Int.left,
-                Vector2Int.right
-            };
-
-        for (int i = 0; i < directions.Count; i++)
-        {
-            int randomIndex =
-                Random.Range(
-                    i,
-                    directions.Count
-                );
-
-            Vector2Int temp =
-                directions[i];
-
-            directions[i] =
-                directions[randomIndex];
-
-            directions[randomIndex] =
-                temp;
-        }
-
-        foreach (Vector2Int direction in directions)
-        {
-            int nextX = x + direction.x;
-            int nextY = y + direction.y;
-
-            if (nextX < 0 || nextX >= width)
-                continue;
-
-            if (nextY < 0 || nextY >= height)
-                continue;
-
-            if (visited[nextX, nextY])
-                continue;
-
-            RemoveWallBetween(
-                tiles[x, y],
-                tiles[nextX, nextY]
-            );
-
-            GenerateConnectedPaths(
-                nextX,
-                nextY,
-                visited
-            );
-        }
-    }
-
-    private void CreateExtraPaths()
-    {
-        for (int x = 0; x < width; x++)
-        {
-            for (int y = 0; y < height; y++)
-            {
-                if (x < width - 1)
-                {
-                    if (Random.value < extraPathChance)
-                    {
-                        RemoveWallBetween(
-                            tiles[x, y],
-                            tiles[x + 1, y]
-                        );
-                    }
-                }
-
-                if (y < height - 1)
-                {
-                    if (Random.value < extraPathChance)
-                    {
-                        RemoveWallBetween(
-                            tiles[x, y],
-                            tiles[x, y + 1]
-                        );
-                    }
-                }
-            }
-        }
-    }
-
-    private void CreateOuterWalls()
-    {
-        for (int x = 0; x < width; x++)
-        {
-            for (int y = 0; y < height; y++)
-            {
-                Tile tile = tiles[x, y];
-
-                if (y == height - 1)
-                    tile.northWall = true;
-
-                if (y == 0)
-                    tile.southWall = true;
-
-                if (x == 0)
-                    tile.westWall = true;
-
-                if (x == width - 1)
-                    tile.eastWall = true;
-            }
-        }
-    }
-
-    private void CreateConnections()
-    {
-        int centerX = width / 2;
-        int centerY = height / 2;
-
-        if (northConnection)
-        {
-            tiles[centerX, height - 1].northWall = false;
-        }
-
-        if (southConnection)
-        {
-            tiles[centerX, 0].southWall = false;
-        }
-
-        if (eastConnection)
-        {
-            tiles[width - 1, centerY].eastWall = false;
-        }
-
-        if (westConnection)
-        {
-            tiles[0, centerY].westWall = false;
-        }
-    }
-
-    // =========================================================
-    // HABITACIONES
-    // =========================================================
-
-    private void GenerateRooms()
-    {
-        if (northConnection && northRoomPrefab != null)
-        {
-            CreateRoom(
-                northRoomPrefab,
-                Direction.North
-            );
-        }
-
-        if (southConnection && southRoomPrefab != null)
-        {
-            CreateRoom(
-                southRoomPrefab,
-                Direction.South
-            );
-        }
-
-        if (eastConnection && eastRoomPrefab != null)
-        {
-            CreateRoom(
-                eastRoomPrefab,
-                Direction.East
-            );
-        }
-
-        if (westConnection && westRoomPrefab != null)
-        {
-            CreateRoom(
-                westRoomPrefab,
-                Direction.West
-            );
-        }
-    }
-
-    private void CreateRoom(
-        GameObject roomPrefab,
-        Direction direction)
-    {
-        GameObject room =
-            Instantiate(
-                roomPrefab,
-                Vector3.zero,
+            GameObject tileObject = Instantiate(
+                central ? tilePrefab : roomTilePrefab,
+                new Vector3(cell.x * tileSize, 0f, cell.y * tileSize),
                 Quaternion.identity,
-                transform
+                parent
             );
 
-        room.name = "Room_" + direction;
+            tileObject.name = central
+                ? "Central_Tile_" + cell.x + "_" + cell.y
+                : "Tile_" + cell.x + "_" + cell.y;
 
-        RoomBuilder roomBuilder =
-            room.GetComponent<RoomBuilder>();
+            Tile tile = tileObject.GetComponent<Tile>();
 
-        if (roomBuilder == null)
-        {
-            Debug.LogError(
-                "RoomBuilder no encontrado en " +
-                roomPrefab.name
-            );
-
-            return;
-        }
-
-        // -----------------------------------------------------
-        // DIMENSIONES DE LA HABITACIÓN
-        // -----------------------------------------------------
-
-        float roomWidth =
-            roomBuilder.width * tileSize;
-
-        float roomHeight =
-            roomBuilder.height * tileSize;
-
-        // -----------------------------------------------------
-        // CENTRO DEL MAPA
-        // -----------------------------------------------------
-
-        float mapCenterX =
-            (width - 1) * tileSize * 0.5f;
-
-        float mapCenterZ =
-            (height - 1) * tileSize * 0.5f;
-
-        // -----------------------------------------------------
-        // EXTENSIONES DEL MAPA
-        // -----------------------------------------------------
-
-        float mapHalfWidth =
-            width * tileSize * 0.5f;
-
-        float mapHalfHeight =
-            height * tileSize * 0.5f;
-
-        // -----------------------------------------------------
-        // ROTACIÓN Y POSICIÓN
-        // -----------------------------------------------------
-
-        switch (direction)
-        {
-            case Direction.North:
-
-                room.transform.rotation =
-                    Quaternion.Euler(
-                        0f,
-                        0f,
-                        0f
-                    );
-
-                room.transform.position =
-                    new Vector3(
-                        mapCenterX,
-                        0f,
-                        mapCenterZ +
-                        mapHalfHeight +
-                        roomHeight * 0.5f +
-                        roomDistance
-                    );
-
-                break;
-
-
-            case Direction.South:
-
-                room.transform.rotation =
-                    Quaternion.Euler(
-                        0f,
-                        180f,
-                        0f
-                    );
-
-                room.transform.position =
-                    new Vector3(
-                        mapCenterX,
-                        0f,
-                        mapCenterZ -
-                        mapHalfHeight -
-                        roomHeight * 0.5f -
-                        roomDistance
-                    );
-
-                break;
-
-
-            case Direction.East:
-
-                room.transform.rotation =
-                    Quaternion.Euler(
-                        0f,
-                        90f,
-                        0f
-                    );
-
-                room.transform.position =
-                    new Vector3(
-                        mapCenterX +
-                        mapHalfWidth +
-                        roomWidth * 0.5f +
-                        roomDistance,
-                        0f,
-                        mapCenterZ
-                    );
-
-                break;
-
-
-            case Direction.West:
-
-                room.transform.rotation =
-                    Quaternion.Euler(
-                        0f,
-                        270f,
-                        0f
-                    );
-
-                room.transform.position =
-                    new Vector3(
-                        mapCenterX -
-                        mapHalfWidth -
-                        roomWidth * 0.5f -
-                        roomDistance,
-                        0f,
-                        mapCenterZ
-                    );
-
-                break;
-        }
-
-        // Generar los tiles después de colocar la habitación
-        roomBuilder.GenerateRoom();
-    }
-
-    // =========================================================
-    // PAREDES
-    // =========================================================
-
-    private void RemoveWallBetween(
-        Tile a,
-        Tile b)
-    {
-        if (a == null || b == null)
-            return;
-
-        Vector2Int difference =
-            b.gridPosition -
-            a.gridPosition;
-
-        if (difference == Vector2Int.right)
-        {
-            a.eastWall = false;
-            b.westWall = false;
-        }
-        else if (difference == Vector2Int.left)
-        {
-            a.westWall = false;
-            b.eastWall = false;
-        }
-        else if (difference == Vector2Int.up)
-        {
-            a.northWall = false;
-            b.southWall = false;
-        }
-        else if (difference == Vector2Int.down)
-        {
-            a.southWall = false;
-            b.northWall = false;
-        }
-    }
-
-    private void UpdateTileVisuals()
-    {
-        for (int x = 0; x < width; x++)
-        {
-            for (int y = 0; y < height; y++)
+            if (tile == null)
             {
-                tiles[x, y].UpdateVisual();
+                Debug.LogError("MapGenerator: El Tile Prefab no tiene Tile.cs.");
+                return;
             }
+
+            tile.Initialize(cell);
+            tile.region = region;
+            tile.walkable = true;
+
+            int mask = Layout.WallMask(cell);
+            tile.northWall = (mask & BoardLayout.WallNorth) != 0;
+            tile.southWall = (mask & BoardLayout.WallSouth) != 0;
+            tile.eastWall = (mask & BoardLayout.WallEast) != 0;
+            tile.westWall = (mask & BoardLayout.WallWest) != 0;
+            tile.UpdateVisual();
         }
+
+        // EventManager.Awake may not have run yet (Awake order is not guaranteed).
+        EventManager events = EventManager.Instance != null ? EventManager.Instance : FindFirstObjectByType<EventManager>();
+
+        if (generateEvents && events != null)
+        {
+            events.GenerateEventTiles();
+        }
+
+        FrameCamera();
+
+        Debug.Log("Mapa generado. Seed: " + seed + " · Casillas: " + Layout.Cells.Count);
+    }
+
+    /// <summary>
+    /// Moves the main camera (keeping its angle and field of view) so the whole board fits on
+    /// screen with a margin for the HUD panels. Disable autoFrameCamera to keep a hand-placed camera.
+    /// </summary>
+    private void FrameCamera()
+    {
+        Camera cam = Camera.main;
+
+        if (!autoFrameCamera || cam == null || Layout == null || Layout.Cells.Count == 0)
+            return;
+
+        Vector2 min = new Vector2(float.MaxValue, float.MaxValue);
+        Vector2 max = new Vector2(float.MinValue, float.MinValue);
+
+        foreach (Vector2Int cell in Layout.Cells)
+        {
+            min = Vector2.Min(min, new Vector2(cell.x, cell.y));
+            max = Vector2.Max(max, new Vector2(cell.x, cell.y));
+        }
+
+        min = (min - Vector2.one * 0.5f) * tileSize;
+        max = (max + Vector2.one * 0.5f) * tileSize;
+
+        Vector3 center = new Vector3((min.x + max.x) * 0.5f, 0f, (min.y + max.y) * 0.5f);
+        float halfX = (max.x - min.x) * 0.5f * cameraMargin;
+        float halfZ = (max.y - min.y) * 0.5f * cameraMargin;
+
+        float vHalf = cam.fieldOfView * 0.5f * Mathf.Deg2Rad;
+        float hHalf = Mathf.Atan(Mathf.Tan(vHalf) * cam.aspect);
+        float distance = Mathf.Max(halfZ / Mathf.Tan(vHalf), halfX / Mathf.Tan(hHalf)) + 2f;
+
+        cam.transform.position = center - cam.transform.forward * distance;
+        cam.farClipPlane = Mathf.Max(cam.farClipPlane, distance * 2f);
+    }
+
+    private RoomBuilder GetRoomTemplate()
+    {
+        GameObject[] prefabs = { northRoomPrefab, southRoomPrefab, eastRoomPrefab, westRoomPrefab };
+
+        foreach (GameObject prefab in prefabs)
+        {
+            if (prefab != null && prefab.TryGetComponent(out RoomBuilder builder))
+                return builder;
+        }
+
+        return null;
+    }
+
+    private Transform GetContainer(Transform[] containers, BoardRegion region)
+    {
+        int index = (int)region;
+
+        if (containers[index] == null)
+        {
+            GameObject room = new GameObject("Room_" + region);
+            room.transform.SetParent(transform, false);
+            containers[index] = room.transform;
+        }
+
+        return containers[index];
     }
 
     // =========================================================
@@ -571,21 +234,7 @@ public class MapGenerator : MonoBehaviour
     {
         for (int i = transform.childCount - 1; i >= 0; i--)
         {
-            Destroy(
-                transform.GetChild(i).gameObject
-            );
+            Destroy(transform.GetChild(i).gameObject);
         }
-    }
-
-    // =========================================================
-    // DIRECCIONES
-    // =========================================================
-
-    private enum Direction
-    {
-        North,
-        South,
-        East,
-        West
     }
 }

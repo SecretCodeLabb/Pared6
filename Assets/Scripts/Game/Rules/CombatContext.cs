@@ -32,15 +32,42 @@ public class CombatContext
     public bool IsSuccess => Result >= Required;
 
     /// <summary>Lives lost if the combat is resolved now.</summary>
-    public int LifeLoss
-    {
-        get
-        {
-            if (IsSuccess || PreventLifeLoss)
-                return 0;
+    public int LifeLoss => IsSuccess ? 0 : DamageIfDefeated;
 
-            return Mathf.Max(0, DamageOnFail - DamageReduction);
+    /// <summary>Lives this side loses when defeated, after its own defence cards.</summary>
+    public int DamageIfDefeated => PreventLifeLoss ? 0 : Mathf.Max(0, DamageOnFail - DamageReduction);
+}
+
+public struct DuelOutcome
+{
+    /// <summary>1 = attacker wins, -1 = defender wins, 0 = draw.</summary>
+    public int Winner;
+    public int AttackerLifeLoss;
+    public int DefenderLifeLoss;
+}
+
+/// <summary>
+/// Duel between two players with the same dice system: each side's result = roll + modifier.
+/// Higher result wins; the loser takes damage (reduced by its own defence cards). Draw = no damage.
+/// </summary>
+public static class DuelResolver
+{
+    public static DuelOutcome Resolve(CombatContext attacker, CombatContext defender)
+    {
+        DuelOutcome outcome = new DuelOutcome();
+
+        if (attacker.Result > defender.Result)
+        {
+            outcome.Winner = 1;
+            outcome.DefenderLifeLoss = defender.DamageIfDefeated;
         }
+        else if (defender.Result > attacker.Result)
+        {
+            outcome.Winner = -1;
+            outcome.AttackerLifeLoss = attacker.DamageIfDefeated;
+        }
+
+        return outcome;
     }
 }
 

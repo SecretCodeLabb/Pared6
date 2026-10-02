@@ -81,14 +81,10 @@ public class BoardManager : MonoBehaviour
     // CELDAS LÓGICAS (RED)
     // =========================================================
 
-    /// <summary>
-    /// Logical, network-safe tile key: world position rounded to integers.
-    /// Unique for central and room tiles (room tiles reuse local gridPositions).
-    /// </summary>
+    /// <summary>Logical, network-safe tile key: the tile's global grid coordinate.</summary>
     public static Vector2Int CellOf(Tile tile)
     {
-        Vector3 p = tile.transform.position;
-        return new Vector2Int(Mathf.RoundToInt(p.x), Mathf.RoundToInt(p.z));
+        return tile.gridPosition;
     }
 
     public Tile GetTile(Vector2Int cell)
@@ -99,7 +95,12 @@ public class BoardManager : MonoBehaviour
 
     public bool IsCentralTile(Tile tile)
     {
-        return tile != null && tile.transform.parent == mapGenerator.transform;
+        return tile != null && tile.region == BoardRegion.Center;
+    }
+
+    public List<Tile> GetAllTiles()
+    {
+        return new List<Tile>(allTiles);
     }
 
     public List<Tile> GetCentralTiles()
@@ -328,43 +329,17 @@ public class BoardManager : MonoBehaviour
         if (currentTile == null)
             return null;
 
+        // Both tiles of the edge must agree there is no wall (they always do with the
+        // shared-wall generator; checking both keeps movement safe if a tile is edited).
         if (currentTile.HasWall(direction))
             return null;
 
-        Vector3 targetPosition =
-            currentTile.transform.position +
-            new Vector3(
-                direction.x,
-                0f,
-                direction.y
-            ) *
-            mapGenerator.tileSize;
+        Tile next = GetTile(currentTile.gridPosition + direction);
 
-        Tile closestTile = null;
+        if (next == null || next.HasWall(-direction))
+            return null;
 
-        float closestDistance =
-            float.MaxValue;
-
-        foreach (Tile tile in allTiles)
-        {
-            if (tile == currentTile)
-                continue;
-
-            float distance =
-                Vector3.Distance(
-                    tile.transform.position,
-                    targetPosition
-                );
-
-            if (distance < 0.01f &&
-                distance < closestDistance)
-            {
-                closestTile = tile;
-                closestDistance = distance;
-            }
-        }
-
-        return closestTile;
+        return next;
     }
 
     // =========================================================

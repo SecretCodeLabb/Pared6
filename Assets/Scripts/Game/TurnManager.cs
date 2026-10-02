@@ -235,11 +235,14 @@ public class TurnManager : NetworkBehaviour
         if (!IsServer || State.Value == TurnState.GameOver)
             return;
 
-        if (playerId != CurrentPlayerId.Value)
+        CombatManager combat = CombatManager.Instance;
+        bool wasDuelDefender = combat != null && combat.IsDuelParticipant(playerId) && playerId != CurrentPlayerId.Value;
+
+        if (playerId != CurrentPlayerId.Value && !wasDuelDefender)
             return;
 
-        if (CombatManager.Instance != null)
-            CombatManager.Instance.ServerAbort();
+        if (combat != null)
+            combat.ServerAbort();
 
         ServerEndTurn();
     }
@@ -336,7 +339,14 @@ public class TurnManager : NetworkBehaviour
         player.GridPosition.Value = BoardManager.CellOf(next);
         MovesRemaining.Value--;
 
-        if (MovesRemaining.Value <= 0 || !Board.HasAnyValidMove(next))
+        // Walking onto another player or (optionally) an active event stops the movement there.
+        bool encounter = FindOpponentAt(player, player.GridPosition.Value) != null ||
+                         (Rules.eventsTriggerWhenPassing && GameStateManager.Instance.Events.HasActiveEvent(next));
+
+        if (encounter && MovesRemaining.Value > 0)
+            Debug.Log($"{NetworkConnectionManager.GetInstanceTag()} {player.Name}: movimiento detenido por un encuentro en {player.GridPosition.Value} ({MovesRemaining.Value} pasos sin usar)");
+
+        if (encounter || MovesRemaining.Value <= 0 || !Board.HasAnyValidMove(next))
             ServerFinishMovement(player);
     }
 
@@ -363,9 +373,17 @@ public class TurnManager : NetworkBehaviour
 
         Vector2Int cell = player.GridPosition.Value;
         Tile tile = Board.GetTile(cell);
+        PlayerNetworkData opponent = FindOpponentAt(player, cell);
 
-        // The event is evaluated only here, when movement has ENDED on the tile.
-        if (GameStateManager.Instance.Events.HasActiveEvent(tile) && CombatManager.Instance != null)
+        // Encounters are evaluated only here, once the movement has stopped on the tile.
+        // A duel with another player takes priority over an event on the same tile.
+        if (opponent != null && CombatManager.Instance != null)
+        {
+            State.Value = TurnState.Combat;
+            RestartDeadline();
+            CombatManager.Instance.ServerBeginDuel(player, opponent);
+        }
+        else if (GameStateManager.Instance.Events.HasActiveEvent(tile) && CombatManager.Instance != null)
         {
             State.Value = TurnState.Combat;
             RestartDeadline();
@@ -375,6 +393,26 @@ public class TurnManager : NetworkBehaviour
         {
             ServerEndTurn();
         }
+    }
+
+    /// <summary>Lowest-PlayerId Alive opponent standing on the cell, or null (duels disabled = always null).</summary>
+    private static PlayerNetworkData FindOpponentAt(PlayerNetworkData mover, Vector2Int cell)
+    {
+        if (!Rules.duelsEnabled)
+            return null;
+
+        PlayerNetworkData found = null;
+
+        foreach (PlayerNetworkData other in PlayerNetworkData.All)
+        {
+            if (other == mover || !other.IsAlive || other.GridPosition.Value != cell)
+                continue;
+
+            if (found == null || other.PlayerId.Value < found.PlayerId.Value)
+                found = other;
+        }
+
+        return found;
     }
 
     // =========================================================

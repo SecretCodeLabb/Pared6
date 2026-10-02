@@ -24,5 +24,6 @@ public enum CombatPhase : byte
     Rolling,
     Resolving,
     Won,
-    Lost
+    Lost,
+    Draw
 }

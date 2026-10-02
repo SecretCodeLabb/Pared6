@@ -49,8 +49,14 @@
 - **Canvas de `Mapa`:** pasado de Constant Pixel Size a Scale With Screen Size (ref. 3840x2160): mismo aspecto en 4K, visible en 1080p.
 - **Pruebas:** `DevAutoPlayer` (solo Editor/Development Build) para E2E automático multi-instancia.
 
+- **T17 (2026-10-02) Tablero, detección y duelos:** generador reescrito como `BoardLayout` puro (grid único,
+  sin rotar habitaciones, paredes compartidas, conectividad total, 1 puerta por habitación). Antes: 270 aristas
+  asimétricas y 335 discrepancias lógica/visual en habitaciones rotadas; ahora 0. Bug de orden de Awake que
+  dejaba 0 eventos offline corregido. Eventos en centro (12) y en cada habitación (4). Pasar por un evento u
+  otro jugador detiene el movimiento; duelos con el mismo sistema de dado+cartas. Cámara auto-encuadrada.
+  40 tests EditMode OK; prueba en red Host+Cliente: hash igual, paradas por encuentro y duelo correctos.
+
 ## Problemas abiertos
-- Habitaciones laterales inaccesibles (entrada desplazada media casilla respecto a la salida central y lógica de paredes sin rotación). Preexistente; no se tocó por la regla de paredes.
 - Cliente cerrado a la fuerza: ~30 s hasta marcarse DESCONECTADO (timeout de Unity Transport; ajustable en `UnityTransport.DisconnectTimeoutMS`).
 - Timeout de turno implementado pero no probado (desactivado por defecto).
 - 4 jugadores reales sin probar (3 sí; lógica de 4 cubierta por tests).
