@@ -56,7 +56,8 @@ public class NetworkConnectionManager : MonoBehaviour
 
         private void Awake()
         {
-            if (Instance != null && Instance != this)
+            // An instance that is returning to the menu is being torn down: the new menu scene's one replaces it.
+            if (Instance != null && Instance != this && !Instance.returningToMenu)
             {
                 Destroy(gameObject);
                 return;
@@ -72,6 +73,13 @@ public class NetworkConnectionManager : MonoBehaviour
 
         private void Start()
         {
+            // After returning to the menu the old NetworkManager may still have been the singleton
+            // when this scene's one was enabled.
+            NetworkManager sceneNetworkManager = GetComponent<NetworkManager>();
+
+            if (sceneNetworkManager != null && NetworkManager.Singleton != sceneNetworkManager)
+                sceneNetworkManager.SetSingleton();
+
             EnsureNetworkManagerConfig();
         }
 

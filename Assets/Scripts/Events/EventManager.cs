@@ -77,21 +77,7 @@ public class EventManager : MonoBehaviour
             eventTile.hasEvent = true;
             eventTile.ResetEvent();
 
-            if (eventIndicatorPrefab != null)
-            {
-                GameObject indicator = Instantiate(
-                    eventIndicatorPrefab,
-                    selectedTile.transform
-                );
-
-                indicator.transform.localPosition = new Vector3(
-                    0f,
-                    eventIndicatorHeight,
-                    0f
-                );
-
-                indicator.transform.localRotation = Quaternion.identity;
-            }
+            CreateIndicator(eventTile);
 
             eventTiles.Add(eventTile);
 
@@ -106,6 +92,116 @@ public class EventManager : MonoBehaviour
             eventTiles.Count +
             " casillas de evento generadas."
         );
+    }
+
+    private void CreateIndicator(EventTile eventTile)
+    {
+        if (eventIndicatorPrefab == null || eventTile.indicator != null)
+            return;
+
+        GameObject indicator = Instantiate(
+            eventIndicatorPrefab,
+            eventTile.transform
+        );
+
+        indicator.transform.localPosition = new Vector3(
+            0f,
+            eventIndicatorHeight,
+            0f
+        );
+
+        indicator.transform.localRotation = Quaternion.identity;
+        eventTile.indicator = indicator;
+    }
+
+    // =========================================================
+    // RED (T05 / T09): el Host decide, todos aplican
+    // =========================================================
+
+    /// <summary>Host only: picks event cells among central tiles, excluding the given cells.</summary>
+    public List<Vector2Int> PickEventCells(
+        BoardManager board,
+        System.Random rng,
+        ICollection<Vector2Int> excluded)
+    {
+        List<Vector2Int> candidates = new List<Vector2Int>();
+
+        foreach (Tile tile in board.GetCentralTiles())
+        {
+            Vector2Int cell = BoardManager.CellOf(tile);
+
+            if (!excluded.Contains(cell))
+                candidates.Add(cell);
+        }
+
+        candidates.Sort((a, b) => a.x != b.x ? a.x.CompareTo(b.x) : a.y.CompareTo(b.y));
+
+        List<Vector2Int> picked = new List<Vector2Int>();
+        int amount = Mathf.Min(eventTileCount, candidates.Count);
+
+        for (int i = 0; i < amount; i++)
+        {
+            int index = rng.Next(candidates.Count);
+            picked.Add(candidates[index]);
+            candidates.RemoveAt(index);
+        }
+
+        return picked;
+    }
+
+    /// <summary>All instances: marks the given cells as event tiles with the existing indicator.</summary>
+    public void ApplyEventCells(BoardManager board, IEnumerable<Vector2Int> cells)
+    {
+        eventTiles.Clear();
+
+        foreach (Vector2Int cell in cells)
+        {
+            Tile tile = board.GetTile(cell);
+
+            if (tile == null)
+            {
+                Debug.LogError("EventManager: event cell " + cell + " does not exist on this board.");
+                continue;
+            }
+
+            EventTile eventTile = tile.GetComponent<EventTile>();
+
+            if (eventTile == null)
+                eventTile = tile.gameObject.AddComponent<EventTile>();
+
+            eventTile.hasEvent = true;
+            eventTile.ResetEvent();
+            CreateIndicator(eventTile);
+            eventTiles.Add(eventTile);
+        }
+
+        Debug.Log("EventManager: " + eventTiles.Count + " casillas de evento aplicadas (red).");
+    }
+
+    public bool HasActiveEvent(Tile tile)
+    {
+        if (tile == null)
+            return false;
+
+        EventTile eventTile = tile.GetComponent<EventTile>();
+        return eventTile != null && eventTile.hasEvent;
+    }
+
+    /// <summary>All instances: the event was beaten, hide its indicator and disable it.</summary>
+    public void ConsumeEvent(Tile tile)
+    {
+        if (tile == null)
+            return;
+
+        EventTile eventTile = tile.GetComponent<EventTile>();
+
+        if (eventTile == null)
+            return;
+
+        eventTile.hasEvent = false;
+
+        if (eventTile.indicator != null)
+            eventTile.indicator.SetActive(false);
     }
 
     private bool IsCentralTile(Tile tile)

@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c995bf1093309df4c9b0164f7fc9faf0, type: 3}
+  m_Name: Card_06_Escudo_3
+  m_EditorClassIdentifier: Pared.Rules::CardData
+  id: 6
+  displayName: Escudo -3
+  type: {fileID: 11400000, guid: cb49a20a117b8a54db8d190b3a5bb882, type: 2}
+  description: "Resta 3 al da\xF1o recibido en este combate."
+  icon: {fileID: 0}
+  effect: {fileID: 11400000, guid: ff0848c7539cad44ba23737cc65157e7, type: 2}

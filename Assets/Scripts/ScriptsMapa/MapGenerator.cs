@@ -38,8 +38,15 @@ public class MapGenerator : MonoBehaviour
 
     private Tile[,] tiles;
 
+    // Network mode: events are decided by the Host, not rolled here (T05).
+    private bool generateEvents = true;
+
     private void Awake()
     {
+        // Network mode: the Host's seed arrives later through GameStateManager.
+        if (NetworkGameMode.IsActive)
+            return;
+
         if (randomizeSeed)
         {
             seed = Random.Range(0, 999999);
@@ -47,6 +54,20 @@ public class MapGenerator : MonoBehaviour
 
         Random.InitState(seed);
 
+        GenerateMap();
+    }
+
+    /// <summary>
+    /// Deterministic generation from an injected seed (T05). Same seed => same walls.
+    /// All randomness happens synchronously inside GenerateMap, so seeding the global RNG is enough.
+    /// </summary>
+    public void GenerateWithSeed(int newSeed, bool includeEvents)
+    {
+        seed = newSeed;
+        randomizeSeed = false;
+        generateEvents = includeEvents;
+
+        Random.InitState(seed);
         GenerateMap();
     }
 
@@ -77,7 +98,7 @@ public class MapGenerator : MonoBehaviour
             GenerateRooms();
         }
 
-        if (EventManager.Instance != null)
+        if (generateEvents && EventManager.Instance != null)
         {
             EventManager.Instance.GenerateEventTiles();
         }

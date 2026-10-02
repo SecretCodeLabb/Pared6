@@ -5,6 +5,9 @@ public class EventTile : MonoBehaviour
     [Header("Event")]
     public bool hasEvent = true;
 
+    [HideInInspector]
+    public GameObject indicator;
+
     private bool eventTriggered = false;
 
     public bool IsTriggered()
