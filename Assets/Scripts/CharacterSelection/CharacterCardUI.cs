@@ -50,6 +50,35 @@ public class CharacterCardUI : MonoBehaviour
         onClickCallback?.Invoke(currentData, this);
     }
 
+    public CharacterData Data => currentData;
+
+    private CanvasGroup canvasGroup;
+    private TextMeshProUGUI ownerLabel;
+
+    /// <summary>Network lobby: dims the card and shows who owns it. Empty owner = free.</summary>
+    public void SetOwner(string ownerName, bool takenByOther)
+    {
+        if (canvasGroup == null)
+            canvasGroup = gameObject.AddComponent<CanvasGroup>();
+
+        canvasGroup.alpha = takenByOther ? 0.4f : 1f;
+
+        if (cardButton != null)
+            cardButton.interactable = !takenByOther;
+
+        if (ownerLabel == null)
+        {
+            Image band = UIFactory.CreatePanel(transform, "OwnerBand", new Color(0f, 0f, 0f, 0.75f));
+            UIFactory.Place(band.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, 6f), new Vector2(230f, 40f));
+            band.raycastTarget = false;
+            ownerLabel = UIFactory.CreateText(band.transform, "OwnerLabel", "", 24f);
+            UIFactory.Stretch(ownerLabel.rectTransform);
+        }
+
+        ownerLabel.transform.parent.gameObject.SetActive(!string.IsNullOrEmpty(ownerName));
+        ownerLabel.text = ownerName;
+    }
+
     public void SetSelected(bool selected)
     {
         isSelected = selected;

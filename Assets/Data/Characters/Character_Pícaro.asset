@@ -21,3 +21,4 @@ MonoBehaviour:
   abilityName: Golpe bolsa
   abilityDescription: "Toma su bolsa y pega m\xE1s fuerte a los jugadores, pero es
     d\xE9bil contra entidades."
+  boardColor: {r: 0.3, g: 0.8, b: 0.35, a: 1}

@@ -219,7 +219,10 @@ public class NetworkConnectUI : MonoBehaviour
             ipInputField.text = "127.0.0.1";
         }
 
-        SetStatus("", Color.white);
+        // Show why we came back to the menu (host closed, kicked, etc.) once.
+        string pending = NetworkConnectionManager.PendingMenuMessage;
+        NetworkConnectionManager.PendingMenuMessage = "";
+        SetStatus(pending, new Color(1f, 0.75f, 0.3f));
         SetButtonsInteractable(true);
 
         if (hostButton != null) hostButton.gameObject.SetActive(true);

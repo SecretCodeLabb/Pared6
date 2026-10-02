@@ -6,6 +6,7 @@ using Unity.Collections;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class NetworkConnectionManager : MonoBehaviour
 {
@@ -17,6 +18,10 @@ public class NetworkConnectionManager : MonoBehaviour
         [SerializeField] private ushort defaultPort = 7777;
         [SerializeField] private int maxPlayers = 4;
         [SerializeField] private float connectionTimeoutSeconds = 8f;
+
+        [Header("Sesión (T03)")]
+        [Tooltip("Prefab with NetworkObject + LobbyManager, spawned by the Host and kept across scenes.")]
+        [SerializeField] private GameObject sessionPrefab;
 
         [Header("Estado de Conexión")]
         [SerializeField] private bool acceptingConnections = true;
@@ -36,6 +41,11 @@ public class NetworkConnectionManager : MonoBehaviour
         public string CurrentIP { get; private set; } = "";
         public ushort CurrentPort { get; private set; } = 0;
 
+        /// <summary>Message to show in the menu after returning from a session (e.g. host closed).</summary>
+        public static string PendingMenuMessage { get; set; } = "";
+
+        private bool returningToMenu;
+
         // Eventos
         public event Action OnConnected;
         public event Action<string> OnDisconnected;
@@ -54,6 +64,10 @@ public class NetworkConnectionManager : MonoBehaviour
 
             Instance = this;
             DontDestroyOnLoad(gameObject);
+
+            // Single source of truth for limits (AGENT_CONTEXT §6).
+            maxPlayers = GameRules.Instance.maxPlayers;
+            defaultPort = GameRules.Instance.port;
         }
 
         private void Start()
@@ -116,6 +130,9 @@ public class NetworkConnectionManager : MonoBehaviour
                 Debug.Log($"{GetInstanceTag()} Host iniciado con éxito en IP: {CurrentIP}:{defaultPort} (Max: {maxPlayers})");
                 OnConnected?.Invoke();
                 OnPlayerCountChanged?.Invoke(ConnectedPlayerCount);
+
+                acceptingConnections = true;
+                SpawnSessionAndOpenLobby();
                 return true;
             }
             else
@@ -264,7 +281,9 @@ public class NetworkConnectionManager : MonoBehaviour
             NetworkManager.ConnectionApprovalRequest request,
             NetworkManager.ConnectionApprovalResponse response)
         {
-            if (!acceptingConnections)
+            bool gameInProgress = LobbyManager.Instance != null && LobbyManager.Instance.GameInProgress.Value;
+
+            if (!acceptingConnections || gameInProgress)
             {
                 response.Approved = false;
                 response.Reason = "Partida ya iniciada.";
@@ -337,7 +356,7 @@ public class NetworkConnectionManager : MonoBehaviour
             // En Cliente
             else
             {
-                if (clientId == NetworkManager.Singleton.LocalClientId)
+                if (clientId == NetworkManager.Singleton.LocalClientId || clientId == NetworkManager.ServerClientId)
                 {
                     string msg = !string.IsNullOrEmpty(reason) ? reason : "Desconectado del servidor.";
                     Debug.LogWarning($"{GetInstanceTag()} Desconectado del servidor. Motivo: {msg}");
@@ -353,6 +372,10 @@ public class NetworkConnectionManager : MonoBehaviour
                         UnsubscribeEvents();
                         OnConnectionFailed?.Invoke(msg);
                     }
+                    else if (SceneManager.GetActiveScene().name != SceneNames.Menu)
+                    {
+                        ReturnToMenu("Desconectado: " + msg);
+                    }
                     else
                     {
                         Shutdown();
@@ -360,6 +383,51 @@ public class NetworkConnectionManager : MonoBehaviour
                     }
                 }
             }
+        }
+
+        // =========================================================
+        // SESSION / SCENE FLOW
+        // =========================================================
+
+        private void SpawnSessionAndOpenLobby()
+        {
+            if (sessionPrefab == null)
+            {
+                Debug.LogError($"{GetInstanceTag()} NetworkConnectionManager: sessionPrefab sin asignar. Ejecuta PPOP/Setup Prototype.");
+                return;
+            }
+
+            GameObject session = Instantiate(sessionPrefab);
+            session.GetComponent<NetworkObject>().Spawn(false);
+
+            NetworkManager.Singleton.SceneManager.LoadScene(SceneNames.CharacterSelection, LoadSceneMode.Single);
+        }
+
+        /// <summary>
+        /// Leaves the session cleanly (Shutdown) and loads the menu scene. Works on Host and Client.
+        /// The menu scene brings its own NetworkManager, so the persistent one is destroyed.
+        /// </summary>
+        public void ReturnToMenu(string message)
+        {
+            if (returningToMenu)
+                return;
+
+            returningToMenu = true;
+            PendingMenuMessage = message ?? "";
+
+            Debug.Log($"{GetInstanceTag()} Volviendo al menú. {message}");
+
+            Shutdown();
+
+            GameObject networkManagerObject = NetworkManager.Singleton != null ? NetworkManager.Singleton.gameObject : null;
+
+            SceneManager.LoadScene(SceneNames.Menu, LoadSceneMode.Single);
+
+            if (networkManagerObject != null)
+                Destroy(networkManagerObject);
+
+            if (networkManagerObject != gameObject)
+                Destroy(gameObject);
         }
 
         private void RegisterMessagingHandlers()

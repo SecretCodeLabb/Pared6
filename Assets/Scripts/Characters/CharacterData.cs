@@ -11,4 +11,7 @@ public class CharacterData : ScriptableObject
     public int baseDefense;
     public string abilityName;
     [TextArea] public string abilityDescription;
+
+    [Tooltip("Pawn tint on the board (network game). Assigned by PPOP/Setup Prototype if empty.")]
+    public Color boardColor = Color.clear;
 }

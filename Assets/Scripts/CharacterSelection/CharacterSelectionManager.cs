@@ -19,9 +19,25 @@ public class CharacterSelectionManager : MonoBehaviour
     private const int MinPlayers = 2;
     private const int MaxPlayers = 4;
 
+    // Network lobby mode (T03/T04): selection becomes a request to the Host.
+    private bool networkMode;
+    private LobbyUI lobbyUI;
+    private readonly List<CharacterCardUI> cards = new List<CharacterCardUI>();
+
     private void Start()
     {
+        networkMode = Unity.Netcode.NetworkManager.Singleton != null &&
+                      Unity.Netcode.NetworkManager.Singleton.IsListening;
+
         PopulateGrid();
+
+        if (networkMode)
+        {
+            lobbyUI = gameObject.AddComponent<LobbyUI>();
+            lobbyUI.Initialize(continueButton, selectedText, characterGrid, cards);
+            return;
+        }
+
         UpdateUI();
         
         if (continueButton != null)
@@ -44,12 +60,19 @@ public class CharacterSelectionManager : MonoBehaviour
             if (cardUI != null)
             {
                 cardUI.Setup(data, OnCharacterClicked);
+                cards.Add(cardUI);
             }
         }
     }
 
     private void OnCharacterClicked(CharacterData data, CharacterCardUI cardUI)
     {
+        if (networkMode)
+        {
+            lobbyUI.RequestCharacter(data);
+            return;
+        }
+
         if (selectedCharacters.Contains(data))
         {
             selectedCharacters.Remove(data);

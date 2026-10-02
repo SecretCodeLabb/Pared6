@@ -20,3 +20,4 @@ MonoBehaviour:
   baseDefense: 7
   abilityName: "M\xE1s velocidad"
   abilityDescription: "Avanza m\xE1s casillas... pero puede caer."
+  boardColor: {r: 0.95, g: 0.85, b: 0.3, a: 1}
