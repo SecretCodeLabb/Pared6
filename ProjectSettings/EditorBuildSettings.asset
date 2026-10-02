@@ -8,6 +8,12 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/LobbyScene.unity
     guid: 96a45f3f223035a49b3f994fadd9d727
+  - enabled: 1
+    path: Assets/Scenes/CharacterSelection.unity
+    guid: ee73543d252d45348994c1c0dc773567
+  - enabled: 1
+    path: Assets/Scenes/Mapa.unity
+    guid: e5192b51767a7a1418dbe80b4471f502
   m_configObjects:
     UnityEditor.XR.ARCore.ARCoreSettings: {fileID: 11400000, guid: 9f414daa65d33214e8dc6887953d291c, type: 2}
     UnityEditor.XR.ARKit.ARKitSettings: {fileID: 11400000, guid: 9c48eb1cd0d22f44994600bcb14e0328, type: 2}

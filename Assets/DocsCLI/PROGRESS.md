@@ -4,14 +4,14 @@
 
 ## EN CURSO
 - Tarea: (ninguna)
-- Último paso hecho: T01 - Auditoría completa del proyecto y generación de docs/PROJECT_AUDIT.md.
-- Siguiente paso: T02 - Conexión LAN Host/Client.
+- Último paso hecho: T02 - Conexión LAN Host/Client implementada, probada a nivel de compilación y sincronización de conteo de jugadores.
+- Siguiente paso: T03 - Sala de espera (escena de selección como lobby).
 
 ## Tareas
 | ID | Tarea | Estado |
 |---|---|---|
 | T01 | Auditoría del proyecto | ✅ |
-| T02 | Conexión LAN Host/Client | ⬜ |
+| T02 | Conexión LAN Host/Client | ✅ |
 | T03 | Sala de espera (escena de selección como lobby) | ⬜ |
 | T04 | Selección de personaje sincronizada + LISTO + START | ⬜ |
 | T05 | Escena Game y tablero determinista | ⬜ |
@@ -30,9 +30,10 @@
 ## Decisiones tomadas
 - **NGO 2.x:** El proyecto cuenta con Netcode for GameObjects 2.13.2 y Unity Transport 2.7.3, por lo que se empleará la sintaxis RPC moderna (`[Rpc(SendTo.Server)]`, `[Rpc(SendTo.ClientsAndHost)]`).
 - **Input System:** El proyecto usa exclusivamente el nuevo Input System (`activeInputHandler: 1`).
-- **Determinismo del Tablero:** Confirmado que `MapGenerator` no es determinista por defecto (`randomizeSeed = true`); se requerirá paso de semilla desde el Host y sincronización antes de generar.
-- **Detección de Eventos:** Confirmado que actualmente `PlayerController` dispara el evento en cada casilla intermedia recorrida. Se corregirá en T09 para activarse solo al terminar el movimiento (`remainingMoves == 0`).
-- **Selección de Personaje:** Actualmente guardada en el singleton `GameSession` (sin red); en T03/T04 se migrará a sincronización mediante NGO autoritativo en Host.
+- **NetworkConnectionManager:** Centraliza la conexión LAN en `Assets/Scripts/Network/NetworkConnectionManager.cs`. Implementa Connection Approval con límite de `maxPlayers = 4` y flag `AcceptingConnections`.
+- **Sincronización Pre-Partida:** Conteo de jugadores sincronizado entre Host y Clientes vía `CustomMessagingManager` (`PPOP_PlayerCount`), permitiendo feedback inmediato ("Conectado — N/4 jugador(es)") sin instanciar NetworkObjects en la escena de menú.
+- **Detección ParrelSync:** Logs etiquetados con `[ParrelSync Clon]` / `[Unity Original]` mediante `#if UNITY_EDITOR` y `ParrelSync.ClonesManager.IsClone()`.
+- **Build Settings:** Registradas las 3 escenas (`LobbyScene`, `CharacterSelection`, `Mapa`) en `EditorBuildSettings.asset`.
 
 ## Problemas abiertos
 - Pregunta 1: Confirmar flujo de escenas: `LobbyScene` ➔ `CharacterSelection` ➔ `Mapa`.
