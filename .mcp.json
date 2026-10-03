@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "unity": {
+      "command": "C:\\Users\\USER\\AppData\\Local\\Unity\\bin\\unity.exe",
+      "args": ["mcp", "--project-path", "D:\\JuegoPared\\My project", "--no-banner"]
+    }
+  }
+}
