@@ -8,4 +8,6 @@ public class PreventLifeLossEffect : CardEffect
     {
         context.PreventLifeLoss = true;
     }
+
+    public override string ShortLabel => "0";
 }

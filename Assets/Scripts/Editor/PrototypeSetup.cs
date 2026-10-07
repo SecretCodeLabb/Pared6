@@ -41,6 +41,7 @@ public static class PrototypeSetup
         RegisterNetworkPrefab(player);
 
         CreateExampleCards();
+        CardDesignSetup.ApplyAll();
 
         SetupMenuScene(session);
         SetupGameScene(player);

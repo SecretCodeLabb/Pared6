@@ -10,15 +10,15 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 11578907c4b102846875650a3f93950b, type: 3}
-  m_Name: Character_Cazador
+  m_Name: Character_vagabundo
   m_EditorClassIdentifier: Assembly-CSharp::CharacterData
-  characterName: Trabajador cansado
-  characterImage: {fileID: 21300000, guid: cf21f5eebd5c14e41b4e0af747bcf273, type: 3}
+  characterName: Vagabundo
+  characterImage: {fileID: 21300000, guid: 0737ac2c7d6f88b4a97573fb83a98dfb, type: 3}
   description: 
   maxLives: 3
-  baseDamage: 4
-  baseDefense: 4
-  abilityName: Tinto
-  abilityDescription: "Toma un sorbo de su taza y avanza m\xE1s casillas, pero se
-    va cansando al usarlo."
-  boardColor: {r: 0.7, g: 0.4, b: 0.2, a: 1}
+  baseDamage: 6
+  baseDefense: 6
+  abilityName: Golpe bolsa
+  abilityDescription: "Toma su bolsa y pega m\xE1s fuerte a los jugadores, pero es
+    d\xE9bil contra entidades."
+  boardColor: {r: 0.3, g: 0.8, b: 0.35, a: 1}

@@ -22,6 +22,8 @@ MonoBehaviour:
   diceMin: 1
   diceMax: 6
   eventTileCount: 5
+  eventsTriggerWhenPassing: 1
+  duelsEnabled: 1
   requiredCombatRoll: 4
   damageOnFail: 1
   consumeOnSuccess: 1

@@ -37,7 +37,7 @@ public class GameHUD : MonoBehaviour
     private Transform handContainer;
     private TextMeshProUGUI handTitle;
     private readonly List<int> shownHand = new List<int>();
-    private readonly List<Image> handCardImages = new List<Image>();
+    private readonly List<GameObject> handCardGlows = new List<GameObject>();
     private int selectedHandIndex = -1;
 
     private GameObject combatPanel;
@@ -191,20 +191,23 @@ public class GameHUD : MonoBehaviour
         moveButtons.Add(button);
     }
 
+    private const float HandCardWidth = 172f;
+    private const float HandCardHeight = HandCardWidth / CardLayout.Aspect;
+
     private void BuildHandPanel(Transform root)
     {
         Image panel = UIFactory.CreatePanel(root, "HandPanel", UIFactory.PanelColor);
-        UIFactory.Place(panel.rectTransform, new Vector2(0.5f, 0f), new Vector2(60f, 12f), new Vector2(900f, 250f));
+        UIFactory.Place(panel.rectTransform, new Vector2(0.5f, 0f), new Vector2(60f, 12f), new Vector2(760f, HandCardHeight + 52f));
         handPanel = panel.gameObject;
 
         handTitle = UIFactory.CreateText(panel.transform, "Title", "MIS CARTAS", 22f);
-        UIFactory.Place(handTitle.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -4f), new Vector2(880f, 30f));
+        UIFactory.Place(handTitle.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -4f), new Vector2(740f, 30f));
         handTitle.color = UIFactory.AccentColor;
 
         RectTransform container = UIFactory.CreateRect(panel.transform, "Cards");
-        UIFactory.Place(container, new Vector2(0.5f, 0f), new Vector2(0f, 10f), new Vector2(880f, 200f));
+        UIFactory.Place(container, new Vector2(0.5f, 0f), new Vector2(0f, 10f), new Vector2(740f, HandCardHeight + 4f));
         HorizontalLayoutGroup layout = container.gameObject.AddComponent<HorizontalLayoutGroup>();
-        layout.spacing = 12f;
+        layout.spacing = 16f;
         layout.childAlignment = TextAnchor.MiddleCenter;
         layout.childControlWidth = false;
         layout.childControlHeight = false;
@@ -430,11 +433,8 @@ public class GameHUD : MonoBehaviour
         bool canUse = CombatManager.Instance != null && CombatManager.Instance.CanLocalUseCard();
         handTitle.text = canUse ? "MIS CARTAS — elige una y pulsa USAR CARTA" : "MIS CARTAS";
 
-        for (int i = 0; i < handCardImages.Count; i++)
-        {
-            bool selected = i == selectedHandIndex;
-            handCardImages[i].color = selected ? new Color(1f, 0.85f, 0.3f) : new Color(0.93f, 0.91f, 0.85f);
-        }
+        for (int i = 0; i < handCardGlows.Count; i++)
+            handCardGlows[i].SetActive(i == selectedHandIndex);
     }
 
     private void RebuildHand(PlayerNetworkData local)
@@ -443,14 +443,14 @@ public class GameHUD : MonoBehaviour
             Destroy(child.gameObject);
 
         shownHand.Clear();
-        handCardImages.Clear();
+        handCardGlows.Clear();
         selectedHandIndex = -1;
 
         for (int i = 0; i < local.Hand.Count; i++)
         {
             int cardId = local.Hand[i];
             shownHand.Add(cardId);
-            handCardImages.Add(CreateCardWidget(cardId, i));
+            handCardGlows.Add(CreateCardWidget(cardId, i));
         }
 
         if (local.Hand.Count == 0)
@@ -460,44 +460,70 @@ public class GameHUD : MonoBehaviour
         }
     }
 
-    private Image CreateCardWidget(int cardId, int index)
+    /// <summary>
+    /// Game card with the final art: type frame (CardType.frame), big value or icon in the
+    /// picture window, name on the banner and description in the black box.
+    /// Returns the selection glow object.
+    /// </summary>
+    private GameObject CreateCardWidget(int cardId, int index)
     {
         CardData card = CardDatabase.Instance.GetById(cardId);
+        CardType type = card != null ? card.type : null;
+        Color typeColor = type != null ? type.color : Color.gray;
 
-        Image background = UIFactory.CreatePanel(handContainer, "Card_" + cardId, new Color(0.93f, 0.91f, 0.85f));
-        background.rectTransform.sizeDelta = new Vector2(200f, 196f);
+        // Root: invisible hit area + button.
+        Image root = UIFactory.CreatePanel(handContainer, "Card_" + cardId, new Color(0f, 0f, 0f, 0f));
+        root.rectTransform.sizeDelta = new Vector2(HandCardWidth, HandCardHeight);
 
-        Button button = background.gameObject.AddComponent<Button>();
-        button.targetGraphic = background;
+        Button button = root.gameObject.AddComponent<Button>();
+        button.targetGraphic = root;
         button.onClick.AddListener(() => selectedHandIndex = selectedHandIndex == index ? -1 : index);
 
-        Color typeColor = card != null && card.type != null ? card.type.color : Color.gray;
-        Image band = UIFactory.CreatePanel(background.transform, "TypeBand", typeColor);
-        UIFactory.Place(band.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -4f), new Vector2(192f, 30f));
-        band.raycastTarget = false;
+        // Selection glow behind the card.
+        Image glow = UIFactory.CreatePanel(root.transform, "Glow", UIFactory.AccentColor);
+        UIFactory.Stretch(glow.rectTransform, -6f);
+        glow.raycastTarget = false;
+        glow.gameObject.SetActive(false);
 
-        TextMeshProUGUI type = UIFactory.CreateText(band.transform, "Type", card != null ? card.TypeName.ToUpper() : "?", 16f);
-        UIFactory.Stretch(type.rectTransform);
-
-        TextMeshProUGUI title = UIFactory.CreateText(background.transform, "Name", card != null ? card.displayName : "Carta " + cardId, 22f);
-        UIFactory.Place(title.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -38f), new Vector2(190f, 56f));
-        title.color = new Color(0.1f, 0.1f, 0.1f);
-        title.fontStyle = FontStyles.Bold;
+        CardLayout.AddImage(root.transform, "WindowFill", CardLayout.Window, null, CardLayout.WindowFill, false);
 
         if (card != null && card.icon != null)
         {
-            Image icon = UIFactory.CreatePanel(background.transform, "Icon", Color.white);
-            icon.sprite = card.icon;
-            icon.preserveAspect = true;
-            icon.raycastTarget = false;
-            UIFactory.Place(icon.rectTransform, new Vector2(1f, 1f), new Vector2(-6f, -38f), new Vector2(36f, 36f));
+            CardLayout.AddImage(root.transform, "Icon", CardLayout.Picture, card.icon, Color.white, true);
+        }
+        else
+        {
+            string label = card != null && card.effect != null ? card.effect.ShortLabel : null;
+            TextMeshProUGUI value = UIFactory.CreateText(root.transform, "Value", string.IsNullOrEmpty(label) ? "?" : label, 64f);
+            CardLayout.Fit(value.rectTransform, CardLayout.Sub(CardLayout.Window, 0.15f, 0.05f, 1f, 0.95f));
+            CardLayout.StyleText(value, 72f, typeColor, true);
+            value.alignment = TextAlignmentOptions.Center;
+            value.outlineWidth = 0.15f;
+            value.outlineColor = new Color32(20, 20, 20, 255);
         }
 
-        TextMeshProUGUI description = UIFactory.CreateText(background.transform, "Description", card != null ? card.description : "", 16f);
-        UIFactory.Place(description.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, 8f), new Vector2(186f, 92f));
-        description.color = new Color(0.2f, 0.2f, 0.2f);
+        if (type != null && type.frame != null)
+        {
+            Image frame = CardLayout.AddImage(root.transform, "Frame", Rect.MinMaxRect(0f, 0f, 1f, 1f), type.frame, Color.white, false);
+            frame.raycastTarget = false;
+        }
 
-        return background;
+        TextMeshProUGUI title = UIFactory.CreateText(root.transform, "Name", card != null ? card.displayName : "Carta " + cardId, 20f);
+        CardLayout.Fit(title.rectTransform, CardLayout.Banner);
+        CardLayout.StyleText(title, 20f, Color.white, true);
+        title.alignment = TextAlignmentOptions.Center;
+        title.outlineWidth = 0.2f;
+        title.outlineColor = new Color32(0, 0, 0, 255);
+
+        string typeName = type != null ? type.displayName.ToUpper() : "";
+        string typeHex = ColorUtility.ToHtmlStringRGB(Color.Lerp(typeColor, Color.white, 0.35f));
+        string body = $"<size=80%><color=#{typeHex}>{typeName}</color></size>\n{(card != null ? card.description : "")}";
+        TextMeshProUGUI description = UIFactory.CreateText(root.transform, "Description", body, 14f);
+        CardLayout.Fit(description.rectTransform, CardLayout.Body);
+        CardLayout.StyleText(description, 15f, new Color(0.93f, 0.93f, 0.93f));
+        description.alignment = TextAlignmentOptions.Center;
+
+        return glow.gameObject;
     }
 
     private void RefreshCombat(PlayerNetworkData local)

@@ -9,4 +9,7 @@ public class CardType : ScriptableObject
 {
     public string displayName = "Tipo";
     public Color color = Color.gray;
+
+    [Tooltip("Card art for this type (Assets/Resources/CardsDesign). Name goes on the banner, description in the black box.")]
+    public Sprite frame;
 }

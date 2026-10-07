@@ -66,7 +66,14 @@ del prefab `Room_01`; `autoFrameCamera` encuadra la cámara en todo el tablero.
    sin efecto = carta que se consume sin hacer nada).
 3. Añádela a la lista de `Assets/Resources/Cards/CardDatabase.asset`. Ya entra en el reparto.
 
-**Nuevo tipo de carta:** Create > PPOP > Cards > **Card Type** (nombre + color). No requiere código.
+**Nuevo tipo de carta:** Create > PPOP > Cards > **Card Type** (nombre, color y `frame` = sprite del diseño). No requiere código.
+
+**Diseño de cartas** (`Assets/Resources/CardsDesign`): Daño = `CartaDamage`, Defensa = `CartaDefensa`,
+Especial = `CartaEspecial`, Inútil = `CartaInutil` (asignados en el campo `frame` de cada `CardType`).
+La carta de personaje (`CartaPersonaje`) es el fondo del prefab `CharacterCard`: cambia la imagen,
+el nombre, la habilidad y los stats de cada personaje. Las zonas (ventana, banda, caja negra) están en
+`Scripts/UI/CardLayout.cs`. Si cambias el arte, ejecuta **PPOP/Apply Card Designs**.
+En la mano, la ventana muestra el `icon` de la carta si tiene, o su valor (+2, −2…) en grande.
 
 ## Cómo añadir un efecto
 

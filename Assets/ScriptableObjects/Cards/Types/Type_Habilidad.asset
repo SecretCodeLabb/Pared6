@@ -12,5 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fe4497e1cad43a743bdd49c5af2b3ff9, type: 3}
   m_Name: Type_Habilidad
   m_EditorClassIdentifier: Pared.Rules::CardType
-  displayName: Habilidad
-  color: {r: 0.55, g: 0.35, b: 0.8, a: 1}
+  displayName: Especial
+  color: {r: 0.45, g: 0.15, b: 0.7, a: 1}
+  frame: {fileID: 21300000, guid: caf98d70599fe1c4f8d1b04f78ef938b, type: 3}

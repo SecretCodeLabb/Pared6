@@ -68,11 +68,14 @@ public class CharacterCardUI : MonoBehaviour
 
         if (ownerLabel == null)
         {
+            // Lower strip of the picture window, so the name, ability and stats stay visible.
             Image band = UIFactory.CreatePanel(transform, "OwnerBand", new Color(0f, 0f, 0f, 0.75f));
-            UIFactory.Place(band.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, 6f), new Vector2(230f, 40f));
+            CardLayout.Fit(band.rectTransform, CardLayout.Sub(CardLayout.Window, 0.02f, 0.02f, 0.98f, 0.17f));
             band.raycastTarget = false;
             ownerLabel = UIFactory.CreateText(band.transform, "OwnerLabel", "", 24f);
             UIFactory.Stretch(ownerLabel.rectTransform);
+            CardLayout.StyleText(ownerLabel, 22f, Color.white, true);
+            ownerLabel.alignment = TextAlignmentOptions.Center;
         }
 
         ownerLabel.transform.parent.gameObject.SetActive(!string.IsNullOrEmpty(ownerName));

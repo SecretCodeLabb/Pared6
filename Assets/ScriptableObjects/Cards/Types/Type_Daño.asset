@@ -13,4 +13,5 @@ MonoBehaviour:
   m_Name: "Type_Da\xF1o"
   m_EditorClassIdentifier: Pared.Rules::CardType
   displayName: "Da\xF1o"
-  color: {r: 0.8, g: 0.25, b: 0.2, a: 1}
+  color: {r: 0.78, g: 0.05, b: 0.1, a: 1}
+  frame: {fileID: 21300000, guid: 4f7e3de9666614a449a3c44521e01bdd, type: 3}

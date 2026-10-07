@@ -10,4 +10,6 @@ public class AddToRollEffect : CardEffect
     {
         context.RollModifier += amount;
     }
+
+    public override string ShortLabel => "+" + amount;
 }

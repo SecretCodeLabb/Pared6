@@ -56,6 +56,8 @@
   otro jugador detiene el movimiento; duelos con el mismo sistema de dado+cartas. Cámara auto-encuadrada.
   40 tests EditMode OK; prueba en red Host+Cliente: hash igual, paradas por encuentro y duelo correctos.
 
+- **T18 (2026-10-06) Diseño final de cartas:** marcos de `Resources/CardsDesign` en las cartas de juego (por `CardType.frame`) y la carta de personaje como fondo del prefab `CharacterCard`. Tipo "Habilidad" renombrado a "Especial". Efectos sin cambios. Editor: `PPOP/Apply Card Designs`.
+
 ## Problemas abiertos
 - Cliente cerrado a la fuerza: ~30 s hasta marcarse DESCONECTADO (timeout de Unity Transport; ajustable en `UnityTransport.DisconnectTimeoutMS`).
 - Timeout de turno implementado pero no probado (desactivado por defecto).

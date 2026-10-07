@@ -10,4 +10,6 @@ public class ReduceDamageEffect : CardEffect
     {
         context.DamageReduction += amount;
     }
+
+    public override string ShortLabel => "-" + amount;
 }
