@@ -1,0 +1,112 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9be6da6e7d2185d458a22cffa2bc1f99, type: 3}
+  m_Name: RouletteConfig
+  m_EditorClassIdentifier: Pared.Rules::RouletteConfig
+  spinSeconds: 3.5
+  resultSeconds: 1.8
+  segmentSizeByWeight: 0
+  options:
+  - label: NADA
+    resultText: No pasa nada
+    color: {r: 0.35, g: 0.35, b: 0.4, a: 1}
+    weight: 20
+    effect: 0
+    amount: 0
+  - label: '+1
+
+      MOV'
+    resultText: "\xA1+1 movimiento ahora!"
+    color: {r: 0.2, g: 0.65, b: 0.3, a: 1}
+    weight: 10
+    effect: 1
+    amount: 1
+  - label: '-1
+
+      MOV'
+    resultText: "-1 en tu pr\xF3xima tirada"
+    color: {r: 0.8, g: 0.45, b: 0.15, a: 1}
+    weight: 8
+    effect: 2
+    amount: 1
+  - label: '+2
+
+      MOV'
+    resultText: "\xA1+2 movimientos ahora!"
+    color: {r: 0.2, g: 0.65, b: 0.3, a: 1}
+    weight: 7
+    effect: 1
+    amount: 2
+  - label: 'PIERDES
+
+      TURNO'
+    resultText: "Pierdes tu pr\xF3ximo turno"
+    color: {r: 0.55, g: 0.25, b: 0.7, a: 1}
+    weight: 5
+    effect: 3
+    amount: 1
+  - label: '-2
+
+      MOV'
+    resultText: "-2 en tu pr\xF3xima tirada"
+    color: {r: 0.8, g: 0.45, b: 0.15, a: 1}
+    weight: 6
+    effect: 2
+    amount: 2
+  - label: "\xA1PELEA!"
+    resultText: "\xA1Una entidad te ataca!"
+    color: {r: 0.8, g: 0.12, b: 0.15, a: 1}
+    weight: 8
+    effect: 7
+    amount: 0
+  - label: '+3
+
+      MOV'
+    resultText: "\xA1+3 movimientos ahora!"
+    color: {r: 0.2, g: 0.65, b: 0.3, a: 1}
+    weight: 4
+    effect: 1
+    amount: 3
+  - label: 'SIN
+
+      CARTAS'
+    resultText: No puedes usar cartas la siguiente ronda
+    color: {r: 0.55, g: 0.25, b: 0.7, a: 1}
+    weight: 6
+    effect: 4
+    amount: 1
+  - label: "-1\nDA\xD1O"
+    resultText: "-1 de da\xF1o la siguiente ronda"
+    color: {r: 0.55, g: 0.25, b: 0.7, a: 1}
+    weight: 6
+    effect: 5
+    amount: 1
+  - label: '-3
+
+      MOV'
+    resultText: "-3 en tu pr\xF3xima tirada"
+    color: {r: 0.8, g: 0.45, b: 0.15, a: 1}
+    weight: 4
+    effect: 2
+    amount: 3
+  - label: "-2\nDA\xD1O"
+    resultText: "-2 de da\xF1o la siguiente ronda"
+    color: {r: 0.55, g: 0.25, b: 0.7, a: 1}
+    weight: 4
+    effect: 5
+    amount: 2
+  - label: "-1 \u2665"
+    resultText: "\xA1Pierdes una vida!"
+    color: {r: 0.8, g: 0.12, b: 0.15, a: 1}
+    weight: 2
+    effect: 6
+    amount: 1

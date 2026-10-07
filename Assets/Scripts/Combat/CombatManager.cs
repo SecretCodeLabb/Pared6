@@ -110,6 +110,7 @@ public class CombatManager : NetworkBehaviour
         PlayerNetworkData local = PlayerNetworkData.Local;
 
         return side != Side.None &&
+               !local.CardsBlocked &&
                Phase.Value == CombatPhase.CardPhase &&
                !HasRolled(side) &&
                CardsUsedBy(side) < Rules.maxCardsPerCombat &&
@@ -132,18 +133,21 @@ public class CombatManager : NetworkBehaviour
     // SERVER: START / ABORT
     // =========================================================
 
-    public void ServerBeginCombat(PlayerNetworkData player, Vector2Int cell)
+    /// <param name="forced">Roulette "pelea obligatoria": fight an entity even without an event tile.</param>
+    public void ServerBeginCombat(PlayerNetworkData player, Vector2Int cell, bool forced = false)
     {
         if (!IsServer)
             return;
 
         ResetState(player, false);
         eventCell = cell;
+        ApplyRoulettePenalty(player, context);
+        SyncContext();
 
-        bool canUseCards = Rules.maxCardsPerCombat > 0 && player.Hand.Count > 0;
+        bool canUseCards = Rules.maxCardsPerCombat > 0 && player.Hand.Count > 0 && !player.CardsBlocked;
         Phase.Value = canUseCards ? CombatPhase.CardPhase : CombatPhase.Rolling;
 
-        AnnounceRpc("¡EVENTO!\n<size=70%>¡TE HAS ENCONTRADO CON UNA AMENAZA!</size>\n<size=55%>" + player.Name + "</size>");
+        AnnounceRpc((forced ? "¡PELEA OBLIGATORIA!" : "¡EVENTO!") + "\n<size=70%>¡TE HAS ENCONTRADO CON UNA AMENAZA!</size>\n<size=55%>" + player.Name + "</size>");
         Debug.Log($"{NetworkConnectionManager.GetInstanceTag()} ¡EVENTO! {player.Name} combate en {cell} (requerido {context.Required})");
     }
 
@@ -156,6 +160,8 @@ public class CombatManager : NetworkBehaviour
 
         defenderContext = new CombatContext(defender.PlayerId.Value, 0, Rules.damageOnFail);
         DefenderPlayerId.Value = defender.PlayerId.Value;
+        ApplyRoulettePenalty(attacker, context);
+        ApplyRoulettePenalty(defender, defenderContext);
         SyncContext();
 
         // Cards (if any) can be played until each side rolls.
@@ -231,6 +237,12 @@ public class CombatManager : NetworkBehaviour
             return;
 
         CombatContext sideContext = side == Side.Defender ? defenderContext : context;
+
+        if (player.CardsBlocked)
+        {
+            Debug.LogWarning($"Combat: UseCard rejected, {player.Name} cannot use cards (roulette).");
+            return;
+        }
 
         if (Phase.Value != CombatPhase.CardPhase || sideContext.Roll > 0)
         {
@@ -443,6 +455,13 @@ public class CombatManager : NetworkBehaviour
         }
 
         return true;
+    }
+
+    /// <summary>Roulette "-daño la siguiente ronda": lowers this side's combat result.</summary>
+    private static void ApplyRoulettePenalty(PlayerNetworkData player, CombatContext sideContext)
+    {
+        if (player != null && sideContext != null)
+            sideContext.RollModifier -= player.ActiveDamagePenalty;
     }
 
     private void SyncContext()

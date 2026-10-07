@@ -24,6 +24,7 @@ MonoBehaviour:
   eventTileCount: 5
   eventsTriggerWhenPassing: 1
   duelsEnabled: 1
+  rouletteEnabled: 1
   requiredCombatRoll: 4
   damageOnFail: 1
   consumeOnSuccess: 1

@@ -30,6 +30,11 @@ public class TurnManager : NetworkBehaviour
 
     private Coroutine pendingRoutine;
 
+    // One roulette spin per turn (extra moves from the wheel do not spin it again).
+    private bool rouletteDoneThisTurn;
+    // Status effects tick once per turn even if ServerEndTurn is reached twice.
+    private int effectsTickedTurn = -1;
+
     private static GameRules Rules => GameRules.Instance;
 
     private BoardManager Board => GameStateManager.Instance.Board;
@@ -172,6 +177,7 @@ public class TurnManager : NetworkBehaviour
         LastRoll.Value = 0;
         MovesRemaining.Value = 0;
         TurnNumber.Value++;
+        rouletteDoneThisTurn = false;
         RestartDeadline();
         State.Value = TurnState.WaitingForRoll;
     }
@@ -191,6 +197,15 @@ public class TurnManager : NetworkBehaviour
         if (GameStateManager.Instance.ServerCheckVictory())
             return;
 
+        // "Next round" roulette effects of the player whose turn ends count down.
+        PlayerNetworkData current = CurrentPlayer;
+
+        if (current != null && effectsTickedTurn != TurnNumber.Value)
+        {
+            effectsTickedTurn = TurnNumber.Value;
+            current.ServerTickTurnEffects();
+        }
+
         StopPending();
         TurnDeadline.Value = 0;
         State.Value = TurnState.TurnEnd;
@@ -205,9 +220,22 @@ public class TurnManager : NetworkBehaviour
         if (State.Value == TurnState.GameOver)
             yield break;
 
-        int next = TurnRotation.GetNextPlayer(
-            CurrentPlayerId.Value,
-            PlayerNetworkData.GetStatesById(Rules.maxPlayers));
+        List<PlayerLifeState> states = PlayerNetworkData.GetStatesById(Rules.maxPlayers);
+        int next = TurnRotation.GetNextPlayer(CurrentPlayerId.Value, states);
+
+        // Roulette "pierdes un turno": skip players with pending skips (each skip is consumed once).
+        for (int guard = 0; guard < Rules.maxPlayers * 4 && next != TurnRotation.NoPlayer; guard++)
+        {
+            PlayerNetworkData candidate = PlayerNetworkData.GetByPlayerId(next);
+
+            if (candidate == null || candidate.SkipTurns.Value <= 0)
+                break;
+
+            candidate.SkipTurns.Value--;
+            candidate.ServerTickTurnEffects();
+            GameStateManager.Instance.ServerBroadcast($"{candidate.Name} pierde este turno");
+            next = TurnRotation.GetNextPlayer(next, states);
+        }
 
         if (next == TurnRotation.NoPlayer)
         {
@@ -224,6 +252,10 @@ public class TurnManager : NetworkBehaviour
             return;
 
         StopPending();
+
+        if (RouletteManager.Instance != null)
+            RouletteManager.Instance.ServerAbort();
+
         TurnDeadline.Value = 0;
         MovesRemaining.Value = 0;
         State.Value = TurnState.GameOver;
@@ -243,6 +275,9 @@ public class TurnManager : NetworkBehaviour
 
         if (combat != null)
             combat.ServerAbort();
+
+        if (RouletteManager.Instance != null)
+            RouletteManager.Instance.ServerAbort();
 
         ServerEndTurn();
     }
@@ -300,11 +335,24 @@ public class TurnManager : NetworkBehaviour
     {
         int roll = UnityEngine.Random.Range(Rules.diceMin, Rules.diceMax + 1);
 
+        // Roulette "-movimiento" is consumed by this roll.
+        int penalty = player.MovePenalty.Value;
+        player.MovePenalty.Value = 0;
+
+        if (penalty > 0)
+            GameStateManager.Instance.ServerBroadcast($"{player.Name}: {roll} - {penalty} por la ruleta");
+
         LastRoll.Value = roll;
-        MovesRemaining.Value = roll;
+        MovesRemaining.Value = Mathf.Max(0, roll - penalty);
         State.Value = TurnState.Moving;
 
-        Debug.Log($"{NetworkConnectionManager.GetInstanceTag()} {player.Name} tira el dado: {roll}");
+        Debug.Log($"{NetworkConnectionManager.GetInstanceTag()} {player.Name} tira el dado: {roll} (penalización {penalty})");
+
+        if (MovesRemaining.Value == 0)
+        {
+            ServerFinishMovement(player);
+            return;
+        }
 
         Tile tile = Board.GetTile(player.GridPosition.Value);
 
@@ -389,10 +437,52 @@ public class TurnManager : NetworkBehaviour
             RestartDeadline();
             CombatManager.Instance.ServerBeginCombat(player, cell);
         }
+        else if (Rules.rouletteEnabled && !rouletteDoneThisTurn && RouletteManager.Instance != null)
+        {
+            // No combat and no duel: spin the roulette (once per turn).
+            rouletteDoneThisTurn = true;
+            State.Value = TurnState.Roulette;
+            RestartDeadline();
+            RouletteManager.Instance.ServerBegin(player);
+        }
         else
         {
             ServerEndTurn();
         }
+    }
+
+    // =========================================================
+    // SERVER: ROULETTE RESULTS
+    // =========================================================
+
+    /// <summary>Host only (roulette "+movimiento"): extra steps right now, same validation as a roll.</summary>
+    public void ServerGrantExtraMoves(PlayerNetworkData player, int amount)
+    {
+        if (!IsServer || State.Value == TurnState.GameOver)
+            return;
+
+        MovesRemaining.Value = Mathf.Max(0, amount);
+        State.Value = TurnState.Moving;
+        RestartDeadline();
+
+        Tile tile = Board.GetTile(player.GridPosition.Value);
+
+        if (MovesRemaining.Value == 0 || tile == null || !Board.HasAnyValidMove(tile))
+            ServerFinishMovement(player);
+    }
+
+    /// <summary>Host only (roulette "pelea obligatoria"): combat against an entity on the current tile.</summary>
+    public void ServerStartForcedFight(PlayerNetworkData player)
+    {
+        if (!IsServer || State.Value == TurnState.GameOver || CombatManager.Instance == null)
+        {
+            ServerEndTurn();
+            return;
+        }
+
+        State.Value = TurnState.Combat;
+        RestartDeadline();
+        CombatManager.Instance.ServerBeginCombat(player, player.GridPosition.Value, true);
     }
 
     /// <summary>Lowest-PlayerId Alive opponent standing on the cell, or null (duels disabled = always null).</summary>
@@ -447,6 +537,11 @@ public class TurnManager : NetworkBehaviour
             case TurnState.Combat:
                 GameStateManager.Instance.ServerBroadcast("Tiempo agotado: tirada automática");
                 CombatManager.Instance.ServerForceRoll();
+                break;
+
+            case TurnState.Roulette:
+                GameStateManager.Instance.ServerBroadcast("Tiempo agotado: la ruleta gira sola");
+                RouletteManager.Instance.ServerForceSpin();
                 break;
         }
     }

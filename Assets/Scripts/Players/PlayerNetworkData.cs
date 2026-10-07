@@ -27,6 +27,17 @@ public class PlayerNetworkData : NetworkBehaviour
     public NetworkVariable<PlayerLifeState> State = new NetworkVariable<PlayerLifeState>(PlayerLifeState.Alive);
     public NetworkVariable<int> HandCount = new NetworkVariable<int>(0);
 
+    // Roulette status effects (written by the Host).
+    /// <summary>Subtracted from the next movement roll.</summary>
+    public NetworkVariable<int> MovePenalty = new NetworkVariable<int>(0);
+    /// <summary>Upcoming turns this player will skip.</summary>
+    public NetworkVariable<int> SkipTurns = new NetworkVariable<int>(0);
+    /// <summary>&gt; 0: cards blocked. Counts down at the end of each of this player's turns.</summary>
+    public NetworkVariable<int> CardsBlockedTurns = new NetworkVariable<int>(0);
+    /// <summary>Subtracted from this player's combat rolls while DamagePenaltyTurns &gt; 0.</summary>
+    public NetworkVariable<int> DamagePenalty = new NetworkVariable<int>(0);
+    public NetworkVariable<int> DamagePenaltyTurns = new NetworkVariable<int>(0);
+
     /// <summary>Card ids. Only the owner (and the Host) receive it; others see HandCount.</summary>
     public NetworkList<int> Hand;
 
@@ -36,6 +47,8 @@ public class PlayerNetworkData : NetworkBehaviour
 
     public ulong OwnerClient => OwnerClientId;
     public bool IsAlive => State.Value == PlayerLifeState.Alive;
+    public bool CardsBlocked => CardsBlockedTurns.Value > 0;
+    public int ActiveDamagePenalty => DamagePenaltyTurns.Value > 0 ? DamagePenalty.Value : 0;
     public string Name => DisplayName.Value.ToString();
     public CharacterData Character => CharacterCatalog.Instance.Get(CharacterId.Value);
 
@@ -137,6 +150,10 @@ public class PlayerNetworkData : NetworkBehaviour
         Lives.OnValueChanged += OnIntChanged;
         Progress.OnValueChanged += OnIntChanged;
         HandCount.OnValueChanged += OnIntChanged;
+        MovePenalty.OnValueChanged += OnIntChanged;
+        SkipTurns.OnValueChanged += OnIntChanged;
+        CardsBlockedTurns.OnValueChanged += OnIntChanged;
+        DamagePenaltyTurns.OnValueChanged += OnIntChanged;
         State.OnValueChanged += OnStateChanged;
         GridPosition.OnValueChanged += OnGridPositionChanged;
         Hand.OnListChanged += OnHandChanged;
@@ -160,6 +177,10 @@ public class PlayerNetworkData : NetworkBehaviour
         Lives.OnValueChanged -= OnIntChanged;
         Progress.OnValueChanged -= OnIntChanged;
         HandCount.OnValueChanged -= OnIntChanged;
+        MovePenalty.OnValueChanged -= OnIntChanged;
+        SkipTurns.OnValueChanged -= OnIntChanged;
+        CardsBlockedTurns.OnValueChanged -= OnIntChanged;
+        DamagePenaltyTurns.OnValueChanged -= OnIntChanged;
         State.OnValueChanged -= OnStateChanged;
         GridPosition.OnValueChanged -= OnGridPositionChanged;
         Hand.OnListChanged -= OnHandChanged;
@@ -206,6 +227,37 @@ public class PlayerNetworkData : NetworkBehaviour
             Hand.Add(id);
 
         HandCount.Value = Hand.Count;
+    }
+
+    /// <summary>
+    /// Host only, at the end of this player's turn: "next round" effects count down.
+    /// Effects received during a turn start at 2, so they last through the player's next turn.
+    /// </summary>
+    public void ServerTickTurnEffects()
+    {
+        if (CardsBlockedTurns.Value > 0)
+            CardsBlockedTurns.Value--;
+
+        if (DamagePenaltyTurns.Value > 0)
+        {
+            DamagePenaltyTurns.Value--;
+
+            if (DamagePenaltyTurns.Value == 0)
+                DamagePenalty.Value = 0;
+        }
+    }
+
+    /// <summary>Short Spanish summary of active status effects for the UI ("" if none).</summary>
+    public string StatusSummary()
+    {
+        List<string> parts = new List<string>();
+
+        if (SkipTurns.Value > 0) parts.Add("pierde turno");
+        if (MovePenalty.Value > 0) parts.Add("-" + MovePenalty.Value + " mov");
+        if (CardsBlocked) parts.Add("sin cartas");
+        if (ActiveDamagePenalty > 0) parts.Add("-" + ActiveDamagePenalty + " daño");
+
+        return string.Join(" · ", parts);
     }
 
     /// <summary>Host only. Removes the card at index; returns its id or -1.</summary>

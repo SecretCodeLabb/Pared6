@@ -22,6 +22,12 @@ public class GameHUD : MonoBehaviour
     [SerializeField] private Button rollButton;
     [SerializeField] private TextMeshProUGUI gameInfoText;
 
+    [Header("Roulette (Prefabs/UI/RouletteWheel)")]
+    [SerializeField] private RouletteWheelView roulettePrefab;
+
+    private RouletteWheelView roulette;
+    private int shownSpinId;
+
     // Built at runtime
     private TextMeshProUGUI turnText;
     private TextMeshProUGUI localTurnText;
@@ -118,6 +124,7 @@ public class GameHUD : MonoBehaviour
         BuildActionsPanel(root);
         BuildHandPanel(root);
         BuildCombatPanel(root);
+        BuildRoulette(root);
         BuildEndPanel(root);
 
         toastText = UIFactory.CreateText(root, "Toasts", "", 26f);
@@ -296,6 +303,7 @@ public class GameHUD : MonoBehaviour
         RefreshLocal(turns, local);
         RefreshHand(local);
         RefreshCombat(local);
+        RefreshRoulette();
         RefreshEnd(turns, game, local);
         RefreshToasts();
 
@@ -339,6 +347,7 @@ public class GameHUD : MonoBehaviour
             case TurnState.Combat: hint = CombatManager.Instance != null && CombatManager.Instance.IsDuel.Value ? "¡Duelo en curso!" : "¡Combate en curso!"; break;
             case TurnState.TurnEnd: hint = "Fin del turno"; break;
             case TurnState.GameOver: hint = "Partida terminada"; break;
+            case TurnState.Roulette: hint = "¡Ruleta!"; break;
             default: hint = ""; break;
         }
 
@@ -388,7 +397,10 @@ public class GameHUD : MonoBehaviour
                     break;
             }
 
-            sb.Append($"   Eventos {p.Progress.Value}/{Rules.requiredEventsToWin}   Cartas {p.HandCount.Value}\n\n");
+            sb.Append($"   Eventos {p.Progress.Value}/{Rules.requiredEventsToWin}   Cartas {p.HandCount.Value}\n");
+
+            string status = p.IsAlive ? p.StatusSummary() : "";
+            sb.Append(string.IsNullOrEmpty(status) ? "\n" : $"     <size=85%><color=#D080FF>{status}</color></size>\n\n");
         }
 
         playersText.text = sb.ToString();
@@ -711,6 +723,64 @@ public class GameHUD : MonoBehaviour
 
         endBody.text = sb.ToString();
         restartButton.gameObject.SetActive(isHost);
+    }
+
+    // =========================================================
+    // ROULETTE
+    // =========================================================
+
+    private void BuildRoulette(Transform root)
+    {
+        if (roulettePrefab == null)
+        {
+            Debug.LogError("GameHUD: roulettePrefab not assigned (Prefabs/UI/RouletteWheel). Run PPOP/Setup Prototype.");
+            return;
+        }
+
+        roulette = Instantiate(roulettePrefab, root);
+        roulette.name = "RouletteWheel";
+        roulette.SpinClicked += OnSpinClicked;
+        roulette.Build(RouletteConfig.Instance);
+        roulette.Hide();
+    }
+
+    /// <summary>Mirrors RouletteManager (Host state) on the wheel view.</summary>
+    private void RefreshRoulette()
+    {
+        RouletteManager manager = RouletteManager.Instance;
+
+        if (roulette == null)
+            return;
+
+        if (manager == null || !manager.IsVisible)
+        {
+            if (roulette.gameObject.activeSelf)
+                roulette.Hide();
+
+            return;
+        }
+
+        PlayerNetworkData spinner = PlayerNetworkData.GetByPlayerId(manager.PlayerId.Value);
+        bool isLocalSpinner = spinner != null && spinner.IsOwner;
+        roulette.Show(spinner != null ? spinner.Name : "?", isLocalSpinner, manager.CanLocalSpin());
+
+        // New spin from the Host: animate to the same result on every instance.
+        if (manager.SpinId.Value != shownSpinId && manager.Phase.Value != RoulettePhase.WaitingSpin)
+        {
+            shownSpinId = manager.SpinId.Value;
+
+            if (manager.Phase.Value == RoulettePhase.Spinning)
+                roulette.PlaySpin(manager.ResultIndex.Value, RouletteConfig.Instance.spinSeconds);
+        }
+
+        if (manager.Phase.Value == RoulettePhase.ShowingResult && manager.Result != null)
+            roulette.ShowResult(manager.Result.resultText);
+    }
+
+    private void OnSpinClicked()
+    {
+        if (RouletteManager.Instance != null)
+            RouletteManager.Instance.RequestSpinFromLocal();
     }
 
     // =========================================================

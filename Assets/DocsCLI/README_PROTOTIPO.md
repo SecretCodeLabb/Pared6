@@ -33,6 +33,13 @@ En builds de desarrollo existe un bot de pruebas:
      `tirada + bonus ≥ requerido` → `¡SUPERASTE EL EVENTO!` (+1 progreso, el evento desaparece);
      si no → `FALLASTE EL EVENTO` (−1 vida, salvo carta de defensa).
    - 0 vidas → ELIMINADO (sale de los turnos).
+   - **Ruleta:** si el movimiento termina **sin** combate ni duelo, aparece una ruleta (el jugador
+     activo pulsa **GIRAR**; el Host decide el resultado y todos ven la misma animación). Una vez por turno.
+     Efectos: +1/+2/+3 movimientos **ahora**; −1/−2/−3 a tu **próxima tirada**; **pierdes un turno**;
+     **sin cartas** y **−1/−2 de daño** (resta a tus tiradas de combate y duelo) hasta el final de tu
+     próximo turno; **pierdes una vida** (probabilidad baja); **pelea obligatoria** contra una entidad
+     (combate normal, cuenta como evento superado si ganas); **nada**. Los efectos activos se ven en
+     la lista de jugadores.
 4. **Fin**: gana el primero en llegar a `requiredEventsToWin` o el último jugador vivo.
    Host: **REINICIAR** (vuelve a la selección conservando personajes). Todos: **VOLVER AL MENÚ**.
 
@@ -58,6 +65,19 @@ Eventos (escena `Mapa`, objeto `EventManager`): `eventTileCount` (tablero centra
 `eventsPerRoom` (cada habitación, 4), `eventIndicatorScale` (tamaño del marcador, 3).
 Tablero (`MapGenerator`): `width`/`height` del centro; tamaño de las habitaciones = `RoomBuilder.width/height`
 del prefab `Room_01`; `autoFrameCamera` encuadra la cámara en todo el tablero.
+
+## Ruleta: probabilidades y aspecto
+
+- **Opciones** (`Assets/Resources/RouletteConfig.asset`): texto del segmento, texto del resultado,
+  color, **peso** (probabilidad = peso / suma de pesos), tipo de efecto y valor. Peso 0 = no sale.
+  También `spinSeconds`, `resultSeconds` y `segmentSizeByWeight` (segmentos iguales o proporcionales).
+  Activar/desactivar la ruleta: `GameRules.rouletteEnabled`.
+- **Aspecto** (`Assets/Prefabs/UI/RouletteWheel.prefab`): cámbialo libremente (sprites, colores,
+  fuentes, tamaños, puntero, borde, botón). Solo mantén asignadas en `RouletteWheelView` las
+  referencias `wheel` (lo que gira), `segmentTemplate` (Image *Filled / Radial 360 / Top / clockwise*
+  con un TMP hijo) y `spinButton`. Opcionales: textos de título, jugador, resultado y botón.
+  Ajustes de animación en el mismo componente (vueltas, curva, posición de etiquetas).
+- **PPOP/Create Roulette** crea los assets solo si no existen (nunca pisa tus cambios).
 
 ## Cómo añadir una carta
 

@@ -58,6 +58,8 @@
 
 - **T18 (2026-10-06) Diseño final de cartas:** marcos de `Resources/CardsDesign` en las cartas de juego (por `CardType.frame`) y la carta de personaje como fondo del prefab `CharacterCard`. Tipo "Habilidad" renombrado a "Especial". Efectos sin cambios. Editor: `PPOP/Apply Card Designs`.
 
+- **T19 (2026-10-06) Ruleta:** `RouletteConfig` (Resources, opciones con peso), `RouletteManager` (Host, en `GameNetwork`), `RouletteWheelView` + prefab `Prefabs/UI/RouletteWheel` (estilo editable). Nuevo `TurnState.Roulette` tras un movimiento sin combate/duelo, una vez por turno. Estados en `PlayerNetworkData` (MovePenalty, SkipTurns, CardsBlockedTurns, DamagePenalty/Turns) que caducan al final del siguiente turno del jugador. Probado en Play cada efecto; 44 tests EditMode.
+
 ## Problemas abiertos
 - Cliente cerrado a la fuerza: ~30 s hasta marcarse DESCONECTADO (timeout de Unity Transport; ajustable en `UnityTransport.DisconnectTimeoutMS`).
 - Timeout de turno implementado pero no probado (desactivado por defecto).

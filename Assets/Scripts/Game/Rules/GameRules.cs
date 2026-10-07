@@ -35,6 +35,10 @@ public class GameRules : ScriptableObject
     [Tooltip("True: entering a tile with another Alive player stops the movement and starts a duel.")]
     public bool duelsEnabled = true;
 
+    [Header("Roulette")]
+    [Tooltip("Spin the roulette after a movement that ends without combat or duel. Options in Resources/RouletteConfig.")]
+    public bool rouletteEnabled = true;
+
     [Header("Combat")]
     public int requiredCombatRoll = 4;
     [Min(0)] public int damageOnFail = 1;

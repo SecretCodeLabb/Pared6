@@ -188,6 +188,14 @@ public class DevAutoPlayer : MonoBehaviour
             return;
         }
 
+        RouletteManager roulette = RouletteManager.Instance;
+
+        if (roulette != null && roulette.CanLocalSpin())
+        {
+            roulette.RequestSpinFromLocal();
+            return;
+        }
+
         if (combat == null || !combat.IsLocalFighter)
             return;
 

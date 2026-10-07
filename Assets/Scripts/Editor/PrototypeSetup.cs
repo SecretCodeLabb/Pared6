@@ -42,6 +42,7 @@ public static class PrototypeSetup
 
         CreateExampleCards();
         CardDesignSetup.ApplyAll();
+        RouletteSetup.EnsureAll();
 
         SetupMenuScene(session);
         SetupGameScene(player);
@@ -348,6 +349,7 @@ public static class PrototypeSetup
         GetOrAdd<TurnManager>(network);
         GetOrAdd<CombatManager>(network);
         GetOrAdd<CardManager>(network);
+        GetOrAdd<RouletteManager>(network);
 
         SerializedObject so = new SerializedObject(state);
         so.FindProperty("boardManager").objectReferenceValue = board;
@@ -372,6 +374,9 @@ public static class PrototypeSetup
         hudSo.FindProperty("boardManager").objectReferenceValue = board;
         hudSo.FindProperty("rollButton").objectReferenceValue = rollButton != null ? rollButton.GetComponent<Button>() : null;
         hudSo.FindProperty("gameInfoText").objectReferenceValue = infoText != null ? infoText.GetComponent<TextMeshProUGUI>() : null;
+
+        GameObject roulettePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(RouletteSetup.PrefabPath);
+        hudSo.FindProperty("roulettePrefab").objectReferenceValue = roulettePrefab != null ? roulettePrefab.GetComponent<RouletteWheelView>() : null;
         hudSo.ApplyModifiedPropertiesWithoutUndo();
 
         // The original canvas was Constant Pixel Size laid out for 3840x2160: scale it instead,

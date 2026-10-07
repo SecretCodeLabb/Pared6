@@ -404,3 +404,73 @@ public class DuelTests
         Assert.AreEqual(0, outcome.AttackerLifeLoss + outcome.DefenderLifeLoss);
     }
 }
+
+public class RouletteTests
+{
+    private static List<RouletteOption> Options(params float[] weights)
+    {
+        var list = new List<RouletteOption>();
+        foreach (float w in weights) list.Add(new RouletteOption { weight = w });
+        return list;
+    }
+
+    [Test]
+    public void PickFollowsCumulativeWeights()
+    {
+        var options = Options(1f, 2f, 1f); // [0,0.25) [0.25,0.75) [0.75,1)
+        Assert.AreEqual(0, RouletteConfig.Pick(options, 0.0));
+        Assert.AreEqual(0, RouletteConfig.Pick(options, 0.24));
+        Assert.AreEqual(1, RouletteConfig.Pick(options, 0.25));
+        Assert.AreEqual(1, RouletteConfig.Pick(options, 0.74));
+        Assert.AreEqual(2, RouletteConfig.Pick(options, 0.75));
+        Assert.AreEqual(2, RouletteConfig.Pick(options, 0.9999));
+    }
+
+    [Test]
+    public void ZeroWeightNeverWins()
+    {
+        var options = Options(0f, 1f, 0f);
+        for (int i = 0; i < 100; i++)
+            Assert.AreEqual(1, RouletteConfig.Pick(options, i / 100.0));
+
+        Assert.AreEqual(-1, RouletteConfig.Pick(Options(0f, 0f), 0.5));
+    }
+
+    [Test]
+    public void DistributionMatchesWeights()
+    {
+        var options = RouletteConfig.CreateDefaultOptions();
+        var rng = new System.Random(42);
+        int[] hits = new int[options.Count];
+        const int samples = 200000;
+
+        for (int i = 0; i < samples; i++)
+            hits[RouletteConfig.Pick(options, rng.NextDouble())]++;
+
+        float total = 0f;
+        foreach (var o in options) total += o.weight;
+
+        for (int i = 0; i < options.Count; i++)
+            Assert.AreEqual(options[i].weight / total, hits[i] / (float)samples, 0.01f, options[i].label);
+    }
+
+    [Test]
+    public void DefaultsCoverEveryEffectAndLifeLossIsRarest()
+    {
+        var options = RouletteConfig.CreateDefaultOptions();
+        var effects = new HashSet<RouletteEffectType>();
+        float lifeLoss = 0f, minOther = float.MaxValue;
+
+        foreach (var o in options)
+        {
+            effects.Add(o.effect);
+            if (o.effect == RouletteEffectType.LoseLife) lifeLoss = o.weight;
+            else minOther = Mathf.Min(minOther, o.weight);
+        }
+
+        foreach (RouletteEffectType e in System.Enum.GetValues(typeof(RouletteEffectType)))
+            Assert.IsTrue(effects.Contains(e), e.ToString());
+
+        Assert.Less(lifeLoss, minOther);
+    }
+}

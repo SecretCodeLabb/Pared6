@@ -14,7 +14,16 @@ public enum TurnState : byte
     CheckingTile,
     Combat,
     TurnEnd,
-    GameOver
+    GameOver,
+    Roulette
+}
+
+public enum RoulettePhase : byte
+{
+    Hidden,
+    WaitingSpin,
+    Spinning,
+    ShowingResult
 }
 
 public enum CombatPhase : byte

@@ -427,6 +427,7 @@ MonoBehaviour:
   boardManager: {fileID: 964703104}
   rollButton: {fileID: 1434723620}
   gameInfoText: {fileID: 1019222678}
+  roulettePrefab: {fileID: 4973470053679310666, guid: 27a72065990211d48ab1dd820dc40fcd, type: 3}
 --- !u!4 &943605609
 Transform:
   m_ObjectHideFlags: 0
@@ -1102,6 +1103,7 @@ GameObject:
   - component: {fileID: 1564498935}
   - component: {fileID: 1564498934}
   - component: {fileID: 1564498933}
+  - component: {fileID: 1564498937}
   m_Layer: 0
   m_Name: GameNetwork
   m_TagString: Untagged
@@ -1476,6 +1478,39 @@ MonoBehaviour:
     UpdateTraits:
       MinSecondsBetweenUpdates: 0
       MaxSecondsBetweenUpdates: 0
+--- !u!114 &1564498937
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1564498930}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 049243fd55d8dcc4ba2cfae34ceac6f4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RouletteManager
+  ShowTopMostFoldoutHeaderGroup: 1
+  Phase:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: 0
+  PlayerId:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: -1
+  ResultIndex:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: -1
+  SpinId:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: 0
 --- !u!1 &1601853952
 GameObject:
   m_ObjectHideFlags: 0
