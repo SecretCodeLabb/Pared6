@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &5948762351358390483
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7354950866923265374}
+  - component: {fileID: 4628124142667804447}
+  m_Layer: 0
+  m_Name: Room_Estudiante
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7354950866923265374
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5948762351358390483}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &4628124142667804447
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5948762351358390483}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 63d2371d5c05b9845bae27ae80300abc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RoomBuilder
+  width: 7
+  height: 7
+  tilePrefab: {fileID: 2370721960751185652, guid: c354fd0c2da2e1f43b502dca446fa7b5, type: 3}
+  tileSize: 2
+  southEntrance: 1
+  extraPathChance: 0.046
+  themeName: Cuarto de Estudiante
+  themeLabelColor: {r: 0.89500004, g: 0.615, b: 0.93, a: 1}
+  decorations:
+  - {fileID: 3788711408352579658, guid: 9d0d0cfa5a3521e4ca8787890b2f20dd, type: 3}
+  - {fileID: 8860192084290074123, guid: d19d153cff99d144b8d455703a91c907, type: 3}
+  decorationChance: 0.4
+  decorationScale: {x: 1.5, y: 2.2}
+  decorationRing: {x: 0.55, y: 0.8}

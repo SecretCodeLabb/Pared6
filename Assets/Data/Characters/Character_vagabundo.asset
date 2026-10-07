@@ -22,3 +22,4 @@ MonoBehaviour:
   abilityDescription: "Toma su bolsa y pega m\xE1s fuerte a los jugadores, pero es
     d\xE9bil contra entidades."
   boardColor: {r: 0.3, g: 0.8, b: 0.35, a: 1}
+  roomPrefab: {fileID: 5311390496947689757, guid: 48bab75d85488b54291531838b3babc3, type: 3}

@@ -14,4 +14,7 @@ public class CharacterData : ScriptableObject
 
     [Tooltip("Pawn tint on the board (network game). Assigned by PPOP/Setup Prototype if empty.")]
     public Color boardColor = Color.clear;
+
+    [Tooltip("Side room style for this character (room prefab with RoomBuilder: tile prefab + decorations). Used when the character is in the match.")]
+    public GameObject roomPrefab;
 }

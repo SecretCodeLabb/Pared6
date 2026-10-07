@@ -1,0 +1,79 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1001 &7728185033905798893
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 772414208379705960, guid: 75bdf5efbe248ee4aa9c8f47eee8b6a3, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 82d3123dbd8e1c2499f96904a9a8ea5c, type: 2}
+    - target: {fileID: 2088245132514582367, guid: 75bdf5efbe248ee4aa9c8f47eee8b6a3, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2088245132514582367, guid: 75bdf5efbe248ee4aa9c8f47eee8b6a3, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2088245132514582367, guid: 75bdf5efbe248ee4aa9c8f47eee8b6a3, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2088245132514582367, guid: 75bdf5efbe248ee4aa9c8f47eee8b6a3, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2088245132514582367, guid: 75bdf5efbe248ee4aa9c8f47eee8b6a3, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2088245132514582367, guid: 75bdf5efbe248ee4aa9c8f47eee8b6a3, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2088245132514582367, guid: 75bdf5efbe248ee4aa9c8f47eee8b6a3, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2088245132514582367, guid: 75bdf5efbe248ee4aa9c8f47eee8b6a3, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2088245132514582367, guid: 75bdf5efbe248ee4aa9c8f47eee8b6a3, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2088245132514582367, guid: 75bdf5efbe248ee4aa9c8f47eee8b6a3, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4506830488914978956, guid: 75bdf5efbe248ee4aa9c8f47eee8b6a3, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 1b26635e9c60fb4498e65f6e34404d5d, type: 2}
+    - target: {fileID: 5451176648331968537, guid: 75bdf5efbe248ee4aa9c8f47eee8b6a3, type: 3}
+      propertyPath: m_Name
+      value: RoomTile_Estudiante
+      objectReference: {fileID: 0}
+    - target: {fileID: 6530283746375244621, guid: 75bdf5efbe248ee4aa9c8f47eee8b6a3, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 82d3123dbd8e1c2499f96904a9a8ea5c, type: 2}
+    - target: {fileID: 7539242461716935005, guid: 75bdf5efbe248ee4aa9c8f47eee8b6a3, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 82d3123dbd8e1c2499f96904a9a8ea5c, type: 2}
+    - target: {fileID: 7576008432696640391, guid: 75bdf5efbe248ee4aa9c8f47eee8b6a3, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 82d3123dbd8e1c2499f96904a9a8ea5c, type: 2}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 75bdf5efbe248ee4aa9c8f47eee8b6a3, type: 3}

@@ -22,3 +22,4 @@ MonoBehaviour:
   abilityDescription: "Toma un sorbo de su taza y avanza m\xE1s casillas, pero se
     va cansando al usarlo."
   boardColor: {r: 0.7, g: 0.4, b: 0.2, a: 1}
+  roomPrefab: {fileID: 5605487581168470325, guid: 28621ab7f898a3e42aa7d7164a3a8f92, type: 3}

@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &3571214201734453933
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1905035609045260221}
+  - component: {fileID: 4962388735111674695}
+  m_Layer: 0
+  m_Name: Room_Chismosa
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1905035609045260221
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3571214201734453933}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &4962388735111674695
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3571214201734453933}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 63d2371d5c05b9845bae27ae80300abc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RoomBuilder
+  width: 7
+  height: 7
+  tilePrefab: {fileID: 2235929721423670928, guid: 1d3ca8598cf1b574da27a241720e8b4c, type: 3}
+  tileSize: 2
+  southEntrance: 1
+  extraPathChance: 0.046
+  themeName: Cuarto de Chismosa
+  themeLabelColor: {r: 0.89500004, g: 0.47500002, b: 0.44, a: 1}
+  decorations:
+  - {fileID: 8119447717691091322, guid: c51686eafbfc8fb4c8847d9f994eeb84, type: 3}
+  - {fileID: 1251405542576542385, guid: 9d153d1fe4313ba4e9ed386554e62775, type: 3}
+  decorationChance: 0.4
+  decorationScale: {x: 1.5, y: 2.2}
+  decorationRing: {x: 0.55, y: 0.8}

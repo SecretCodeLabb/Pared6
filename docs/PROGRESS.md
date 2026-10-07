@@ -60,6 +60,8 @@
 
 - **T19 (2026-10-06) Ruleta:** `RouletteConfig` (Resources, opciones con peso), `RouletteManager` (Host, en `GameNetwork`), `RouletteWheelView` + prefab `Prefabs/UI/RouletteWheel` (estilo editable). Nuevo `TurnState.Roulette` tras un movimiento sin combate/duelo, una vez por turno. Estados en `PlayerNetworkData` (MovePenalty, SkipTurns, CardsBlockedTurns, DamagePenalty/Turns) que caducan al final del siguiente turno del jugador. Probado en Play cada efecto; 44 tests EditMode.
 
+- **T20 (2026-10-06) Habitaciones por personaje:** `RoomBuilder` con tema visual (tilePrefab, decorations, themeName); `CharacterData.roomPrefab`; `RoomThemeAssignment` (N, E, S, O en orden de jugador + relleno por semilla) sincronizado en `GameStateManager.RoomCharacterIds`; `MapGenerator` aplica estilo por lado y decora con RNG propio (paredes intactas, auditoría 0 discrepancias). 6 temas de ejemplo con primitivas. 48 tests.
+
 ## Problemas abiertos
 - Cliente cerrado a la fuerza: ~30 s hasta marcarse DESCONECTADO (timeout de Unity Transport; ajustable en `UnityTransport.DisconnectTimeoutMS`).
 - Timeout de turno implementado pero no probado (desactivado por defecto).

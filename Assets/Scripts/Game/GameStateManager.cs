@@ -31,6 +31,9 @@ public class GameStateManager : NetworkBehaviour
     /// <summary>Cells that still hold an active event. Removing a cell consumes it on every instance.</summary>
     public NetworkList<Vector2Int> EventCells;
 
+    /// <summary>Character id styling each side room (RoomThemeAssignment.SideOrder: N, E, S, W).</summary>
+    public NetworkList<int> RoomCharacterIds;
+
     /// <summary>Raised on every instance with a short message for everyone (toast).</summary>
     public static event Action<string> MessageReceived;
 
@@ -46,6 +49,7 @@ public class GameStateManager : NetworkBehaviour
     {
         Instance = this;
         EventCells = new NetworkList<Vector2Int>();
+        RoomCharacterIds = new NetworkList<int>();
     }
 
     // =========================================================
@@ -67,6 +71,11 @@ public class GameStateManager : NetworkBehaviour
 
             int seed = new System.Random().Next(1, 999999);
             BoardSeed.Value = seed;
+
+            // Side rooms take the look of the characters in this match.
+            foreach (int characterId in RoomThemeAssignment.Assign(ChosenCharacterIds(), CharacterCatalog.Instance.Count, seed))
+                RoomCharacterIds.Add(characterId);
+
             BuildBoard(seed);
 
             System.Random eventRng = new System.Random(seed);
@@ -116,8 +125,39 @@ public class GameStateManager : NetworkBehaviour
         return ok;
     }
 
+    /// <summary>Host only: characters of the connected lobby slots, in PlayerId order.</summary>
+    private List<int> ChosenCharacterIds()
+    {
+        List<int> ids = new List<int>();
+
+        if (LobbyManager.Instance == null)
+            return ids;
+
+        foreach (LobbySlot slot in LobbyManager.Instance.GetSlotsSorted())
+        {
+            if (slot.Connected)
+                ids.Add(slot.CharacterId);
+        }
+
+        return ids;
+    }
+
+    private void ApplyRoomThemes()
+    {
+        mapGenerator.ClearRoomThemes();
+
+        for (int i = 0; i < RoomCharacterIds.Count && i < RoomThemeAssignment.SideOrder.Length; i++)
+        {
+            CharacterData character = CharacterCatalog.Instance.Get(RoomCharacterIds[i]);
+
+            if (character != null && character.roomPrefab != null)
+                mapGenerator.SetRoomTheme(RoomThemeAssignment.SideOrder[i], character.roomPrefab);
+        }
+    }
+
     private void BuildBoard(int seed)
     {
+        ApplyRoomThemes();
         mapGenerator.GenerateWithSeed(seed, false);
         boardManager.InitializeBoard();
     }

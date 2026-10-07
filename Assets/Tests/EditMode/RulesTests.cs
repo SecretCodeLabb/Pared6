@@ -474,3 +474,41 @@ public class RouletteTests
         Assert.Less(lifeLoss, minOther);
     }
 }
+
+public class RoomThemeAssignmentTests
+{
+    [Test]
+    public void ChosenCharactersFillSidesInPlayerOrder()
+    {
+        int[] sides = RoomThemeAssignment.Assign(new List<int> { 3, 0 }, 6, 123);
+        Assert.AreEqual(3, sides[0]); // North = player 1
+        Assert.AreEqual(0, sides[1]); // East  = player 2
+    }
+
+    [Test]
+    public void FreeSidesUseDistinctUnchosenCharacters()
+    {
+        int[] sides = RoomThemeAssignment.Assign(new List<int> { 3, 0 }, 6, 123);
+        CollectionAssert.AllItemsAreUnique(sides);
+        CollectionAssert.DoesNotContain(new[] { sides[2], sides[3] }, 3);
+        CollectionAssert.DoesNotContain(new[] { sides[2], sides[3] }, 0);
+    }
+
+    [Test]
+    public void SameSeedSameRooms()
+    {
+        CollectionAssert.AreEqual(
+            RoomThemeAssignment.Assign(new List<int> { 1 }, 6, 77),
+            RoomThemeAssignment.Assign(new List<int> { 1 }, 6, 77));
+    }
+
+    [Test]
+    public void FourPlayersUseOnlyTheirCharactersAndInvalidIdsAreSkipped()
+    {
+        CollectionAssert.AreEqual(new[] { 5, 4, 2, 1 }, RoomThemeAssignment.Assign(new List<int> { 5, 4, 2, 1 }, 6, 1));
+
+        int[] sides = RoomThemeAssignment.Assign(new List<int> { -1, 2, 2 }, 6, 1);
+        Assert.AreEqual(2, sides[0]);
+        CollectionAssert.AllItemsAreUnique(sides);
+    }
+}

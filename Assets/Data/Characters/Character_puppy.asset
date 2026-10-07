@@ -21,3 +21,4 @@ MonoBehaviour:
   abilityName: Bolso de fiesta
   abilityDescription: Puede sacar una habilidad especial de uso desconocido.
   boardColor: {r: 0.35, g: 0.45, b: 0.95, a: 1}
+  roomPrefab: {fileID: 5438636099964906182, guid: c51a0d65d7be0f94098a9209510caf84, type: 3}

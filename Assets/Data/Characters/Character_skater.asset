@@ -21,3 +21,4 @@ MonoBehaviour:
   abilityName: "M\xE1s velocidad"
   abilityDescription: "Avanza m\xE1s casillas... pero puede caer."
   boardColor: {r: 0.95, g: 0.85, b: 0.3, a: 1}
+  roomPrefab: {fileID: 5163112373989827298, guid: aa3db0bf0f650894c88ae1bf2b9d8059, type: 3}

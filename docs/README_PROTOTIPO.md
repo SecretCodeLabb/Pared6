@@ -79,6 +79,26 @@ del prefab `Room_01`; `autoFrameCamera` encuadra la cámara en todo el tablero.
   Ajustes de animación en el mismo componente (vueltas, curva, posición de etiquetas).
 - **PPOP/Create Roulette** crea los assets solo si no existen (nunca pisa tus cambios).
 
+## Habitaciones laterales por personaje
+
+Cada personaje tiene su habitación (`CharacterData.roomPrefab`). En cada partida el Host asigna
+las 4 habitaciones: los personajes elegidos van en orden de jugador a **Norte, Este, Sur, Oeste**;
+los lados libres toman personajes no elegidos (según la semilla). El laberinto, el tamaño y la
+puerta de cada habitación siguen siendo procedurales e iguales para todas: el tema es **solo visual**.
+
+El prefab de habitación (`RoomBuilder`) define el aspecto:
+- `tilePrefab`: casilla de esa habitación (variante de `TilesRoom` con tus modelos/materiales de
+  suelo y paredes; mantén `Tile` + `TileView` y los 4 muros `Wall_*`).
+- `decorations`: modelos 3D que aparecen por el suelo (cualquier prefab), con `decorationChance`,
+  `decorationScale` y `decorationRing` (se colocan en anillo dejando libre el centro de la casilla).
+- `themeName` / `themeLabelColor`: nombre flotante sobre la habitación (vacío = sin nombre).
+
+Ejemplos con formas básicas en `Assets/Prefabs/Rooms/<Personaje>/` (creados por
+**PPOP/Create Example Room Themes**, que solo rellena personajes sin habitación). Para tu arte final:
+cambia materiales/modelos de `RoomTile_<Personaje>` y la lista `decorations` de `Room_<Personaje>`.
+El tamaño de las habitaciones y la densidad de caminos salen de `Room_01` (asignado en `MapGenerator`).
+En modo offline sin selección se usa `Room_01` en los 4 lados.
+
 ## Cómo añadir una carta
 
 1. Clic derecho en `Assets/ScriptableObjects/Cards/Cards` > Create > PPOP > Cards > **Card Data**.

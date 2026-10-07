@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &5438636099964906182
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8860786758867038648}
+  - component: {fileID: 6658928587938796820}
+  m_Layer: 0
+  m_Name: Room_Puppy
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8860786758867038648
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5438636099964906182}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &6658928587938796820
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5438636099964906182}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 63d2371d5c05b9845bae27ae80300abc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RoomBuilder
+  width: 7
+  height: 7
+  tilePrefab: {fileID: 1322414563713067140, guid: 1fb0f97e957880a479bda7cd8f998660, type: 3}
+  tileSize: 2
+  southEntrance: 1
+  extraPathChance: 0.046
+  themeName: Cuarto de Puppy
+  themeLabelColor: {r: 0.545, g: 0.615, b: 0.965, a: 1}
+  decorations:
+  - {fileID: 3814813285314824347, guid: cc1ade2b29e3b4543a5cda57f7e3468a, type: 3}
+  - {fileID: 4842557021994652935, guid: 84e9de288a9c9f04bb4c1827261801f1, type: 3}
+  decorationChance: 0.4
+  decorationScale: {x: 1.5, y: 2.2}
+  decorationRing: {x: 0.55, y: 0.8}

@@ -43,6 +43,7 @@ public static class PrototypeSetup
         CreateExampleCards();
         CardDesignSetup.ApplyAll();
         RouletteSetup.EnsureAll();
+        RoomThemeSetup.CreateAll();
 
         SetupMenuScene(session);
         SetupGameScene(player);

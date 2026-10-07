@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &5163112373989827298
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8152589797079713519}
+  - component: {fileID: 1822551285441916933}
+  m_Layer: 0
+  m_Name: Room_Skater
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8152589797079713519
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5163112373989827298}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1822551285441916933
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5163112373989827298}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 63d2371d5c05b9845bae27ae80300abc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RoomBuilder
+  width: 7
+  height: 7
+  tilePrefab: {fileID: 8777438358720746976, guid: a51afd5a349c89848a23abbf6be1eae6, type: 3}
+  tileSize: 2
+  southEntrance: 1
+  extraPathChance: 0.046
+  themeName: Cuarto de Skater
+  themeLabelColor: {r: 0.965, g: 0.89500004, b: 0.51, a: 1}
+  decorations:
+  - {fileID: 2398762396479680528, guid: 4b3793ac904c05a428cc6f4cca1e91a7, type: 3}
+  - {fileID: 5137855902643508716, guid: c34abde982c4fbc4fbe93b6d0698a070, type: 3}
+  decorationChance: 0.4
+  decorationScale: {x: 1.5, y: 2.2}
+  decorationRing: {x: 0.55, y: 0.8}

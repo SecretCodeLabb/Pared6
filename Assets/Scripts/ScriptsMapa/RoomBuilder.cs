@@ -18,6 +18,30 @@ public class RoomBuilder : MonoBehaviour
     [Range(0f, 1f)]
     public float extraPathChance = 0.35f;
 
+    // =========================================================
+    // ROOM THEME (visual only; walls stay procedural)
+    // =========================================================
+
+    [Header("Room Theme (visual only)")]
+    [Tooltip("Name shown above the room in the game (e.g. \"Cuarto de Chismosa\"). Empty = no label.")]
+    public string themeName;
+
+    [Tooltip("Color of the floating room name.")]
+    public Color themeLabelColor = Color.white;
+
+    [Tooltip("Props scattered on the floor of this room (any 3D prefab). Colliders are removed at spawn.")]
+    public List<GameObject> decorations = new List<GameObject>();
+
+    [Tooltip("Chance per tile of spawning one decoration.")]
+    [Range(0f, 1f)]
+    public float decorationChance = 0.35f;
+
+    [Tooltip("Random uniform scale range applied to each decoration.")]
+    public Vector2 decorationScale = new Vector2(0.8f, 1.2f);
+
+    [Tooltip("Decorations are placed in a ring around the tile centre (fraction of half a tile), leaving the centre free for pawns and events.")]
+    public Vector2 decorationRing = new Vector2(0.55f, 0.8f);
+
     private Tile[,] tiles;
 
     public void GenerateRoom()

@@ -21,3 +21,4 @@ MonoBehaviour:
   abilityName: "Sesi\xF3n de chisme"
   abilityDescription: "Puede ver entidades ocultas que hay cerca de su posici\xF3n."
   boardColor: {r: 0.85, g: 0.25, b: 0.2, a: 1}
+  roomPrefab: {fileID: 3571214201734453933, guid: 5602b0b53f53bed4cb480f20696bc8ec, type: 3}
