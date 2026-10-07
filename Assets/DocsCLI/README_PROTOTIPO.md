@@ -70,11 +70,11 @@ del prefab `Room_01`; `autoFrameCamera` encuadra la cámara en todo el tablero.
 
 - **Opciones** (`Assets/Resources/RouletteConfig.asset`): texto del segmento, texto del resultado,
   color, **peso** (probabilidad = peso / suma de pesos), tipo de efecto y valor. Peso 0 = no sale.
-  También `spinSeconds`, `resultSeconds` y `segmentSizeByWeight` (segmentos iguales o proporcionales).
+  También `autoSpinSeconds` (si nadie gira en ese tiempo, gira sola; 0 = nunca), `spinSeconds`, `resultSeconds` y `segmentSizeByWeight` (segmentos iguales o proporcionales).
   Activar/desactivar la ruleta: `GameRules.rouletteEnabled`.
 - **Aspecto** (`Assets/Prefabs/UI/RouletteWheel.prefab`): cámbialo libremente (sprites, colores,
   fuentes, tamaños, puntero, borde, botón). Solo mantén asignadas en `RouletteWheelView` las
-  referencias `wheel` (lo que gira), `segmentTemplate` (Image *Filled / Radial 360 / Top / clockwise*
+  referencias (el botón necesita *Raycast Target* activo en su imagen; el script lo fuerza) `wheel` (lo que gira), `segmentTemplate` (Image *Filled / Radial 360 / Top / clockwise*
   con un TMP hijo) y `spinButton`. Opcionales: textos de título, jugador, resultado y botón.
   Ajustes de animación en el mismo componente (vueltas, curva, posición de etiquetas).
 - **PPOP/Create Roulette** crea los assets solo si no existen (nunca pisa tus cambios).

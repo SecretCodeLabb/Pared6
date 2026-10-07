@@ -20,7 +20,34 @@ public static class RouletteSetup
     public static GameObject EnsureAll()
     {
         EnsureConfig();
-        return EnsurePrefab();
+        GameObject prefab = EnsurePrefab();
+        FixSpinButton();
+        return prefab;
+    }
+
+    /// <summary>
+    /// Makes the existing prefab's spin button clickable again (its Image had raycastTarget off,
+    /// so the full-screen dimmer swallowed every click). Only touches that one flag.
+    /// </summary>
+    [MenuItem("PPOP/Fix Roulette Button")]
+    public static void FixSpinButton()
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(PrefabPath);
+        bool changed = false;
+
+        foreach (Button button in root.GetComponentsInChildren<Button>(true))
+        {
+            if (button.targetGraphic != null && !button.targetGraphic.raycastTarget)
+            {
+                button.targetGraphic.raycastTarget = true;
+                changed = true;
+            }
+        }
+
+        if (changed)
+            PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
+
+        PrefabUtility.UnloadPrefabContents(root);
     }
 
     public static RouletteConfig EnsureConfig()
@@ -111,6 +138,7 @@ public static class RouletteSetup
 
         Image buttonImage = NewImage(panel.transform, "SpinButton", rounded, Gold);
         buttonImage.type = Image.Type.Sliced;
+        buttonImage.raycastTarget = true; // the button must receive clicks
         Place(buttonImage.rectTransform, Top, new Vector2(0f, -808f), new Vector2(300f, 70f));
         Button button = buttonImage.gameObject.AddComponent<Button>();
         button.targetGraphic = buttonImage;

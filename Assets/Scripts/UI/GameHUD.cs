@@ -762,7 +762,7 @@ public class GameHUD : MonoBehaviour
 
         PlayerNetworkData spinner = PlayerNetworkData.GetByPlayerId(manager.PlayerId.Value);
         bool isLocalSpinner = spinner != null && spinner.IsOwner;
-        roulette.Show(spinner != null ? spinner.Name : "?", isLocalSpinner, manager.CanLocalSpin());
+        roulette.Show(spinner != null ? spinner.Name : "?", isLocalSpinner, manager.CanLocalSpin(), manager.AutoSpinSecondsLeft);
 
         // New spin from the Host: animate to the same result on every instance.
         if (manager.SpinId.Value != shownSpinId && manager.Phase.Value != RoulettePhase.WaitingSpin)

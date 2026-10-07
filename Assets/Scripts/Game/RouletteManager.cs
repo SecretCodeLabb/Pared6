@@ -19,6 +19,9 @@ public class RouletteManager : NetworkBehaviour
     /// <summary>Incremented on every spin so clients know when to start the animation.</summary>
     public NetworkVariable<int> SpinId = new NetworkVariable<int>(0);
 
+    /// <summary>Server time at which the wheel spins by itself; 0 = no auto-spin.</summary>
+    public NetworkVariable<double> AutoSpinAt = new NetworkVariable<double>(0);
+
     private Coroutine routine;
 
     private static RouletteConfig Config => RouletteConfig.Instance;
@@ -44,6 +47,18 @@ public class RouletteManager : NetworkBehaviour
     // =========================================================
 
     public bool IsVisible => IsSpawned && Phase.Value != RoulettePhase.Hidden;
+
+    /// <summary>Seconds until the automatic spin, or -1 when not waiting / disabled.</summary>
+    public float AutoSpinSecondsLeft
+    {
+        get
+        {
+            if (Phase.Value != RoulettePhase.WaitingSpin || AutoSpinAt.Value <= 0 || NetworkManager == null)
+                return -1f;
+
+            return Mathf.Max(0f, (float)(AutoSpinAt.Value - NetworkManager.ServerTime.Time));
+        }
+    }
 
     public RouletteOption Result =>
         ResultIndex.Value >= 0 && ResultIndex.Value < Config.options.Count ? Config.options[ResultIndex.Value] : null;
@@ -77,7 +92,26 @@ public class RouletteManager : NetworkBehaviour
         StopRoutine();
         PlayerId.Value = player.PlayerId.Value;
         ResultIndex.Value = -1;
+
+        float wait = Config.autoSpinSeconds;
+        AutoSpinAt.Value = wait > 0f ? NetworkManager.ServerTime.Time + wait : 0;
         Phase.Value = RoulettePhase.WaitingSpin;
+
+        // Safety net: the game never gets stuck waiting for a spin.
+        if (wait > 0f)
+            routine = StartCoroutine(AutoSpinAfter(player, wait));
+    }
+
+    private IEnumerator AutoSpinAfter(PlayerNetworkData player, float seconds)
+    {
+        yield return new WaitForSeconds(seconds);
+        routine = null;
+
+        if (Phase.Value != RoulettePhase.WaitingSpin)
+            yield break;
+
+        GameStateManager.Instance.ServerBroadcast("La ruleta gira sola");
+        ServerSpin(player);
     }
 
     [Rpc(SendTo.Server)]
@@ -110,6 +144,9 @@ public class RouletteManager : NetworkBehaviour
 
     private void ServerSpin(PlayerNetworkData player)
     {
+        StopRoutine();
+        AutoSpinAt.Value = 0;
+
         int index = RouletteConfig.Pick(Config.options, Random.value * 0.999999f);
 
         if (index < 0)

@@ -48,6 +48,9 @@ public class RouletteConfig : ScriptableObject
     [Tooltip("Seconds the result stays on screen before the effect is applied.")]
     [Min(0f)] public float resultSeconds = 1.8f;
 
+    [Tooltip("If nobody presses GIRAR within these seconds, the wheel spins by itself (0 = never). Keeps the game from getting stuck.")]
+    [Min(0f)] public float autoSpinSeconds = 12f;
+
     [Tooltip("True: segment size reflects its probability. False: equal segments (classic casino look).")]
     public bool segmentSizeByWeight = false;
 

@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Pared.Rules::RouletteConfig
   spinSeconds: 3.5
   resultSeconds: 1.8
+  autoSpinSeconds: 12
   segmentSizeByWeight: 0
   options:
   - label: NADA

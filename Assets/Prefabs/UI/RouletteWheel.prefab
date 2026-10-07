@@ -61,7 +61,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 0.96, g: 0.8, b: 0.15, a: 1}
-  m_RaycastTarget: 0
+  m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
@@ -417,7 +417,7 @@ MonoBehaviour:
   m_text: "\u25BC"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_sharedMaterial: {fileID: 0}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -984,6 +984,9 @@ MonoBehaviour:
   spinLabel: GIRAR
   waitingFormat: '{0} va a girar la ruleta...'
   localTurnText: "\xA1Te toca girar la ruleta!"
+  autoSpinFormat: '
+
+    <size=75%>gira sola en {0} s</size>'
 --- !u!1 &4115010967300367270
 GameObject:
   m_ObjectHideFlags: 0

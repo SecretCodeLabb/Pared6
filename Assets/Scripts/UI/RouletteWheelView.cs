@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 /// <summary>
@@ -45,7 +46,9 @@ public class RouletteWheelView : MonoBehaviour
     [SerializeField] private string title = "¡RULETA!";
     [SerializeField] private string spinLabel = "GIRAR";
     [SerializeField] private string waitingFormat = "{0} va a girar la ruleta...";
-    [SerializeField] private string localTurnText = "¡Te toca girar la ruleta!";
+    [SerializeField] private string localTurnText = "¡Te toca girar la ruleta! (Espacio)";
+    [Tooltip("Appended while waiting; {0} = seconds left before the wheel spins by itself.")]
+    [SerializeField] private string autoSpinFormat = "\n<size=75%>gira sola en {0} s</size>";
 
     /// <summary>Raised when the local player presses the spin button.</summary>
     public event Action SpinClicked;
@@ -63,7 +66,14 @@ public class RouletteWheelView : MonoBehaviour
             Debug.LogError("RouletteWheelView: assign wheel, segmentTemplate and spinButton in the prefab.");
 
         if (spinButton != null)
+        {
             spinButton.onClick.AddListener(() => SpinClicked?.Invoke());
+
+            // Restyling safety: the button's graphic must receive clicks, otherwise the
+            // full-screen dimmer behind it swallows them and the wheel can never be spun.
+            if (spinButton.targetGraphic != null)
+                spinButton.targetGraphic.raycastTarget = true;
+        }
 
         if (segmentTemplate != null)
             segmentTemplate.gameObject.SetActive(false);
@@ -151,22 +161,42 @@ public class RouletteWheelView : MonoBehaviour
         label.localRotation = Quaternion.Euler(0f, 0f, -halfAngle + (radialLabels ? 90f : 0f) + flip);
     }
 
+    private void Update()
+    {
+        // Keyboard shortcut for the same action as the button.
+        Keyboard keyboard = Keyboard.current;
+
+        if (keyboard == null || spinButton == null || !spinButton.isActiveAndEnabled || !spinButton.interactable)
+            return;
+
+        if (keyboard.spaceKey.wasPressedThisFrame || keyboard.enterKey.wasPressedThisFrame || keyboard.numpadEnterKey.wasPressedThisFrame)
+            SpinClicked?.Invoke();
+    }
+
     // =========================================================
     // STATES
     // =========================================================
 
     /// <param name="isLocalSpinner">The local player is the one spinning.</param>
     /// <param name="localCanSpin">The local player can press the button right now.</param>
-    public void Show(string playerName, bool isLocalSpinner, bool localCanSpin)
+    /// <param name="autoSpinIn">Seconds before the automatic spin, or -1 to hide the countdown.</param>
+    public void Show(string playerName, bool isLocalSpinner, bool localCanSpin, float autoSpinIn = -1f)
     {
         gameObject.SetActive(true);
 
         if (playerText != null)
         {
+            string text;
+
             if (isLocalSpinner)
-                playerText.text = localCanSpin ? localTurnText : "";
+                text = localCanSpin ? localTurnText : "";
             else
-                playerText.text = string.Format(waitingFormat, playerName);
+                text = string.Format(waitingFormat, playerName);
+
+            if (autoSpinIn >= 0f && !IsSpinning)
+                text += string.Format(autoSpinFormat, Mathf.CeilToInt(autoSpinIn));
+
+            playerText.text = text;
         }
 
         if (spinButton != null)
