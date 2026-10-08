@@ -48,6 +48,40 @@ Ejecutar: Window > General > Test Runner > EditMode > Run All, o
 | Timeout de turno (`turnTimeoutSeconds > 0`) | ⬜ implementado, no probado (desactivado por defecto) |
 | 4 jugadores reales | ⬜ manual (lógica cubierta por tests) |
 
+## Prueba con 2 builds (2026-10-07)
+
+Dos instancias de `Builds/Dev/Pared.exe` jugando solas con `DevAutoPlayer`:
+
+```
+Pared.exe -autohost -autoplay -players 2 -games 3 -quitonmenu [-hardrules] -logFile host.log
+Pared.exe -autojoin 127.0.0.1 -autoplay -quitonmenu -logFile client1.log
+```
+
+El bot del Host crea la partida, pulsa START al tener 2 jugadores listos y REINICIAR tras cada final.
+Los bots eligen personaje al azar, caminan casi siempre hacia su casilla de misión (camino más corto)
+y a veces al azar, juegan cartas especiales en su turno y cartas válidas en combate/duelo, y fallan
+la misión un 40 % de las veces. `-hardrules` (solo en ese proceso) sube `requiredCombatRoll` a 5 y
+deja 2 vidas para forzar eliminaciones. Todos los mensajes del juego quedan en el log del Host (`[Juego]`).
+
+5 partidas completas (2 normales + 3 con `-hardrules`), 0 excepciones, 0 desincronizaciones:
+
+| Mecánica | Resultado |
+|---|---|
+| Tablero igual en ambas instancias | ✅ hash idéntico en las 5 partidas |
+| Ruleta tras moverse sin combate | ✅ 51 tiradas (±movimiento, penalizaciones, entidad, nada, pierdes turno consumido) |
+| Combates de evento con cartas | ✅ 14 combates (Golpe, Escudo, ruleta −daño aplicada) |
+| Duelos al cruzarse | ✅ 3 duelos, 1 escape con Gatos fotocopiados |
+| Cartas especiales en turno | ✅ Cívica, Comida Frita, Silencio líquido |
+| Misiones | ✅ 5 iniciadas, 1 fallida + reintento, 4 completadas → victoria |
+| Victoria por último en pie | ✅ J1 eliminado → gana J2 |
+| REINICIAR y volver al menú | ✅ 3 reinicios; ambos procesos salen solos al final |
+
+**Errores encontrados y corregidos**
+- Silencio líquido tiraba dos veces el 85 % en la misma casilla (al pasar y al revisar la casilla):
+  ahora la decisión es una sola por casilla y turno (`engagedEventsThisTurn`).
+- Log de combate mostraba `6 + -2`; ahora `6 -2`.
+- Bot: tiraba el dado justo después de jugar una carta de turno (warning "Roll rejected"); ahora espera.
+
 ## Checklist manual para ti (2 Editores con ParrelSync)
 
 1. Abre el clon (`My project_clone_0`) con ParrelSync y el original. Escena `LobbyScene` en ambos.

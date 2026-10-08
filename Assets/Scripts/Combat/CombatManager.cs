@@ -429,7 +429,7 @@ public class CombatManager : NetworkBehaviour
             Phase.Value = CombatPhase.Lost;
         }
 
-        Debug.Log($"{NetworkConnectionManager.GetInstanceTag()} Combate {player.Name}: {context.Roll} + {context.RollModifier} = {context.Result} vs {context.Required} -> {(outcome.Won ? "SUPERADO" : "FALLADO")} (vidas -{outcome.LifeLoss})");
+        Debug.Log($"{NetworkConnectionManager.GetInstanceTag()} Combate {player.Name}: {context.Roll} {context.RollModifier:+0;-0;+0} = {context.Result} vs {context.Required} -> {(outcome.Won ? "SUPERADO" : "FALLADO")} (vidas -{outcome.LifeLoss})");
 
         finishRoutine = StartCoroutine(FinishAfterDelay());
     }

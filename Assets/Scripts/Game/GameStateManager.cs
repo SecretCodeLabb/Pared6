@@ -352,8 +352,12 @@ public class GameStateManager : NetworkBehaviour
     /// <summary>Host only: shows a short message to everyone.</summary>
     public void ServerBroadcast(string message)
     {
-        if (IsServer)
-            ShowMessageRpc(message);
+        if (!IsServer)
+            return;
+
+        // Also in the Host log: a readable timeline of the game (cards, roulette, duels, missions).
+        Debug.Log($"{NetworkConnectionManager.GetInstanceTag()} [Juego] {message}");
+        ShowMessageRpc(message);
     }
 
     [Rpc(SendTo.ClientsAndHost)]

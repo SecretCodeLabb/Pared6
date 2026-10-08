@@ -70,6 +70,8 @@
 
 - **T24 (2026-10-07) Misiones por personaje:** casilla de misión al fondo de cada habitación (`BoardLayout.MissionCell`), sin eventos; `MissionDefinition` por personaje (`CharacterData.mission`); `MissionManager` (Host, `TurnState.Mission`); base `MissionMinigame` + `PlaceholderMissionMinigame`; marcadores `MissionTileMarker`. Victoria: primero en completar su misión o último en pie (`VictoryRules`); `requiredEventsToWin` eliminado. Probado en Play: llegar a la casilla, fallar y reintentar, completar → victoria, casilla de otro personaje no activa nada. 56 tests.
 
+- **Prueba 2 builds (2026-10-07):** `DevAutoPlayer` ampliado (`-autohost`, `-players`, `-games`, `-hardrules`, camino a la misión, cartas especiales); 5 partidas completas entre 2 builds sin errores ni desincronización. Corregida la doble tirada de Silencio líquido en una misma casilla. Detalle en TEST_PLAN.
+
 ## Problemas abiertos
 - Cliente cerrado a la fuerza: ~30 s hasta marcarse DESCONECTADO (timeout de Unity Transport; ajustable en `UnityTransport.DisconnectTimeoutMS`).
 - Timeout de turno implementado pero no probado (desactivado por defecto).

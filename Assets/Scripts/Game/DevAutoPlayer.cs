@@ -6,22 +6,34 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 /// <summary>
-/// Development-only bot for end-to-end testing without a second person.
-/// Command line (dev build): -autojoin 127.0.0.1  [-autoplay]  [-quitonmenu]
-///   -autojoin   connects as client, picks the first free character and presses LISTO.
-///   -autoplay   also plays its own turns (roll, random valid steps, combat).
-///   -quitonmenu quits the app when it lands back in the menu after having joined.
-/// In the Editor it can be enabled from code: DevAutoPlayer.Enable(autoPlay: true).
-/// Uses exactly the same requests as the UI; the Host validates everything.
+/// Development-only bot for end-to-end testing without people.
+/// Command line (dev build):
+///   -autohost            create the game, START when -players are ready, restart for -games games
+///   -autojoin 127.0.0.1  join as client
+///   -autoplay            play own turns (see HandleGame)
+///   -players N           players needed before the host presses START (default 2)
+///   -games N             full games the host plays before leaving (default 1)
+///   -quitonmenu          quit when back in the menu after having played
+///   -hardrules           (host, testing) harder combats and 2 lives to force eliminations / revives
+/// In the Editor: DevAutoPlayer.Enable(autoPlay: true).
+/// It only uses the same requests as the UI; the Host validates everything.
 /// </summary>
 public class DevAutoPlayer : MonoBehaviour
 {
     private const float ActionInterval = 0.5f;
+    private const float GameOverWait = 5f;
 
     private string autoJoinIp;
+    private bool autoHost;
     private bool autoPlay;
     private bool quitOnMenu;
+    private int playersNeeded = 2;
+    private int gamesToPlay = 1;
+
     private bool hasJoined;
+    private bool hostStarted;
+    private int gamesFinished;
+    private float gameOverAt = -1f;
     private float nextAction;
     private readonly System.Random rng = new System.Random();
 
@@ -32,22 +44,38 @@ public class DevAutoPlayer : MonoBehaviour
     {
         string[] args = Environment.GetCommandLineArgs();
         string ip = null;
-        bool play = false;
-        bool quit = false;
+        bool host = false, play = false, quit = false, hard = false;
+        int players = 2, games = 1;
 
         for (int i = 0; i < args.Length; i++)
         {
             if (args[i] == "-autojoin" && i + 1 < args.Length) ip = args[i + 1];
+            if (args[i] == "-autohost") host = true;
             if (args[i] == "-autoplay") play = true;
             if (args[i] == "-quitonmenu") quit = true;
+            if (args[i] == "-hardrules") hard = true;
+            if (args[i] == "-players" && i + 1 < args.Length) int.TryParse(args[i + 1], out players);
+            if (args[i] == "-games" && i + 1 < args.Length) int.TryParse(args[i + 1], out games);
         }
 
-        if (ip == null)
+        if (ip == null && !host)
             return;
+
+        if (hard)
+        {
+            // Runtime only (this process); the GameRules asset is not modified.
+            GameRules.Instance.requiredCombatRoll = 5;
+            GameRules.Instance.startingLives = 2;
+            Debug.Log("[DevAutoPlayer] hard rules: requiredCombatRoll 5, startingLives 2");
+        }
 
         DevAutoPlayer bot = Enable(play);
         bot.autoJoinIp = ip;
+        bot.autoHost = host;
         bot.quitOnMenu = quit;
+        bot.playersNeeded = Mathf.Max(1, players);
+        bot.gamesToPlay = Mathf.Max(1, games);
+        Debug.Log($"[DevAutoPlayer] host {host} join {ip} play {play} players {bot.playersNeeded} games {bot.gamesToPlay}");
     }
 
     public static DevAutoPlayer Enable(bool autoPlay)
@@ -60,7 +88,6 @@ public class DevAutoPlayer : MonoBehaviour
         }
 
         Active.autoPlay = autoPlay;
-        Debug.Log("[DevAutoPlayer] enabled (autoPlay " + autoPlay + ")");
         return Active;
     }
 
@@ -99,9 +126,13 @@ public class DevAutoPlayer : MonoBehaviour
 
         if (scene == SceneNames.CharacterSelection)
             HandleLobby();
-        else if (scene == SceneNames.Game && autoPlay)
+        else if (scene == SceneNames.Game)
             HandleGame();
     }
+
+    // =========================================================
+    // MENU / LOBBY
+    // =========================================================
 
     private void HandleMenu(bool listening)
     {
@@ -112,16 +143,27 @@ public class DevAutoPlayer : MonoBehaviour
             return;
         }
 
-        if (!hasJoined && !listening && autoJoinIp != null && NetworkConnectionManager.Instance != null &&
-            !NetworkConnectionManager.Instance.IsConnecting)
+        NetworkConnectionManager connection = NetworkConnectionManager.Instance;
+
+        if (hasJoined || listening || connection == null || connection.IsConnecting)
+            return;
+
+        if (autoHost && !hostStarted)
+        {
+            hostStarted = true;
+            Debug.Log("[DevAutoPlayer] creating game");
+            connection.StartHost();
+        }
+        else if (autoJoinIp != null)
         {
             Debug.Log("[DevAutoPlayer] joining " + autoJoinIp);
-            NetworkConnectionManager.Instance.StartClient(autoJoinIp, GameRules.Instance.port);
+            connection.StartClient(autoJoinIp, GameRules.Instance.port);
         }
     }
 
     private void HandleLobby()
     {
+        gameOverAt = -1f;
         LobbyManager lobby = LobbyManager.Instance;
 
         if (lobby == null || !lobby.TryGetLocalSlot(out LobbySlot local))
@@ -134,66 +176,79 @@ public class DevAutoPlayer : MonoBehaviour
             foreach (LobbySlot slot in lobby.Slots)
                 taken.Add(slot.CharacterId);
 
+            // Random free character so different rooms / missions get tested.
+            List<int> free = new List<int>();
+
             for (int id = 0; id < CharacterCatalog.Instance.Count; id++)
             {
                 if (!taken.Contains(id))
-                {
-                    lobby.RequestSelectCharacterRpc(id);
-                    return;
-                }
+                    free.Add(id);
             }
+
+            if (free.Count > 0)
+                lobby.RequestSelectCharacterRpc(free[rng.Next(free.Count)]);
 
             return;
         }
 
         if (!local.Ready)
+        {
             lobby.RequestReadyRpc(true);
+            return;
+        }
+
+        if (autoHost && NetworkManager.Singleton.IsHost &&
+            lobby.ConnectedCount >= playersNeeded && lobby.CanStartGame())
+        {
+            Debug.Log($"[DevAutoPlayer] START game {gamesFinished + 1}");
+            lobby.ServerStartGame();
+        }
     }
+
+    // =========================================================
+    // GAME
+    // =========================================================
 
     private void HandleGame()
     {
         TurnManager turns = TurnManager.Instance;
-        CombatManager combat = CombatManager.Instance;
         PlayerNetworkData local = PlayerNetworkData.Local;
 
         if (turns == null || local == null || !turns.IsSpawned)
             return;
 
+        if (turns.State.Value == TurnState.GameOver)
+        {
+            HandleGameOver();
+            return;
+        }
+
+        if (!autoPlay)
+            return;
+
         if (turns.CanLocalPlayerRoll())
         {
-            turns.RequestRollFromLocalPlayer();
+            // A played card changes the state on the Host; roll on a later tick.
+            if (!TryTurnCard(turns, local))
+                turns.RequestRollFromLocalPlayer();
+
             return;
         }
 
         if (turns.CanLocalPlayerMove())
         {
-            PlayerController controller = local.GetComponent<PlayerController>();
-
-            if (controller != null && controller.IsAnimating)
-                return;
-
-            BoardManager board = GameStateManager.Instance.Board;
-            Tile tile = board.GetTile(local.GridPosition.Value);
-            List<Vector2Int> options = new List<Vector2Int>();
-
-            foreach (Vector2Int d in new[] { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right })
-            {
-                if (board.GetNeighbor(tile, d) != null)
-                    options.Add(d);
-            }
-
-            if (options.Count > 0)
-                turns.RequestMoveFromLocalPlayer(options[rng.Next(options.Count)]);
-
+            Move(turns, local);
             return;
         }
 
-        // Bot completes its mission placeholder (dev testing only).
         MissionManager mission = MissionManager.Instance;
 
         if (mission != null && mission.IsSpawned && mission.Phase.Value == MissionPhase.Active && mission.IsLocalMission)
         {
-            mission.RequestFinishFromLocal(true);
+            // Fail sometimes so the retry path gets exercised.
+            bool success = rng.NextDouble() < 0.6;
+            Debug.Log("[DevAutoPlayer] mission " + (success ? "completed" : "failed"));
+            mission.RequestFinishFromLocal(success);
             return;
         }
 
@@ -205,13 +260,150 @@ public class DevAutoPlayer : MonoBehaviour
             return;
         }
 
+        HandleCombat(local);
+    }
+
+    private void HandleGameOver()
+    {
+        if (gameOverAt < 0f)
+        {
+            gameOverAt = Time.unscaledTime;
+            GameStateManager game = GameStateManager.Instance;
+            PlayerNetworkData winner = PlayerNetworkData.GetByPlayerId(game.WinnerPlayerId.Value);
+            Debug.Log($"[DevAutoPlayer] GAME OVER. Winner: {(winner != null ? winner.Name + " mission " + winner.MissionCompleted.Value : "none")}");
+            return;
+        }
+
+        if (!autoHost || !NetworkManager.Singleton.IsHost || Time.unscaledTime - gameOverAt < GameOverWait)
+            return;
+
+        gamesFinished++;
+        gameOverAt = float.MaxValue;
+
+        if (gamesFinished < gamesToPlay)
+        {
+            Debug.Log("[DevAutoPlayer] restarting");
+            GameStateManager.Instance.ServerRestart();
+        }
+        else
+        {
+            Debug.Log("[DevAutoPlayer] all games played, leaving");
+            NetworkConnectionManager.Instance.ReturnToMenu("");
+        }
+    }
+
+    /// <summary>Plays an own-turn special card now and then (heal only when hurt).</summary>
+    private bool TryTurnCard(TurnManager turns, PlayerNetworkData local)
+    {
+        if (rng.NextDouble() > 0.4)
+            return false;
+
+        for (int i = 0; i < local.Hand.Count; i++)
+        {
+            CardData card = CardDatabase.Instance.GetById(local.Hand[i]);
+
+            if (!CardRules.CanPlayOnOwnTurn(card) || !turns.CanLocalPlayTurnCard(i))
+                continue;
+
+            if (card.effect is SpecialCardEffect special && special.ability == SpecialAbility.Heal &&
+                local.Lives.Value >= GameRules.Instance.startingLives)
+                continue;
+
+            Debug.Log("[DevAutoPlayer] plays turn card " + card.displayName);
+            turns.RequestPlayTurnCardFromLocal(i);
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>Usually walks towards the own mission tile (shortest path), sometimes wanders.</summary>
+    private void Move(TurnManager turns, PlayerNetworkData local)
+    {
+        PlayerController controller = local.GetComponent<PlayerController>();
+
+        if (controller != null && controller.IsAnimating)
+            return;
+
+        BoardManager board = GameStateManager.Instance.Board;
+        Tile tile = board.GetTile(local.GridPosition.Value);
+        Vector2Int direction = Vector2Int.zero;
+
+        if (rng.NextDouble() < 0.75 && GameStateManager.Instance.TryGetMissionCell(local, out Vector2Int target))
+            direction = FirstStepTowards(board, tile, target);
+
+        if (direction == Vector2Int.zero)
+        {
+            List<Vector2Int> options = new List<Vector2Int>();
+
+            foreach (Vector2Int d in BoardLayout.Directions)
+            {
+                if (board.GetNeighbor(tile, d) != null)
+                    options.Add(d);
+            }
+
+            if (options.Count > 0)
+                direction = options[rng.Next(options.Count)];
+        }
+
+        if (direction != Vector2Int.zero)
+            turns.RequestMoveFromLocalPlayer(direction);
+    }
+
+    private static Vector2Int FirstStepTowards(BoardManager board, Tile start, Vector2Int target)
+    {
+        if (start == null || start.gridPosition == target)
+            return Vector2Int.zero;
+
+        Dictionary<Vector2Int, Vector2Int> firstStep = new Dictionary<Vector2Int, Vector2Int>();
+        Queue<Tile> queue = new Queue<Tile>();
+        HashSet<Vector2Int> seen = new HashSet<Vector2Int> { start.gridPosition };
+        queue.Enqueue(start);
+
+        while (queue.Count > 0)
+        {
+            Tile current = queue.Dequeue();
+
+            foreach (Vector2Int d in BoardLayout.Directions)
+            {
+                Tile next = board.GetNeighbor(current, d);
+
+                if (next == null || !seen.Add(next.gridPosition))
+                    continue;
+
+                firstStep[next.gridPosition] = current == start ? d : firstStep[current.gridPosition];
+
+                if (next.gridPosition == target)
+                    return firstStep[next.gridPosition];
+
+                queue.Enqueue(next);
+            }
+        }
+
+        return Vector2Int.zero;
+    }
+
+    private void HandleCombat(PlayerNetworkData local)
+    {
+        CombatManager combat = CombatManager.Instance;
+
         if (combat == null || !combat.IsLocalFighter)
             return;
 
-        if (combat.CanLocalUseCard() && rng.Next(2) == 0)
+        if (combat.CanLocalUseCard() && rng.NextDouble() < 0.5)
         {
-            combat.RequestUseCardFromLocal(0, local.Hand[0]);
-            return;
+            for (int i = 0; i < local.Hand.Count; i++)
+            {
+                CardData card = CardDatabase.Instance.GetById(local.Hand[i]);
+                bool playable = combat.IsDuel.Value ? CardRules.CanPlayInDuel(card) : CardRules.CanPlayInEventCombat(card);
+
+                if (playable)
+                {
+                    Debug.Log("[DevAutoPlayer] plays combat card " + card.displayName);
+                    combat.RequestUseCardFromLocal(i, local.Hand[i]);
+                    return;
+                }
+            }
         }
 
         if (combat.CanLocalRoll())

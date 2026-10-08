@@ -39,6 +39,8 @@ public class TurnManager : NetworkBehaviour
     // One own-turn special card per turn; event cells dodged this turn are not re-triggered.
     private bool turnCardUsedThisTurn;
     private readonly HashSet<Vector2Int> avoidedEventsThisTurn = new HashSet<Vector2Int>();
+    // Event cells where the dodge already failed this turn (decided once, never re-rolled).
+    private readonly HashSet<Vector2Int> engagedEventsThisTurn = new HashSet<Vector2Int>();
     // Status effects tick once per turn even if ServerEndTurn is reached twice.
     private int effectsTickedTurn = -1;
 
@@ -187,6 +189,7 @@ public class TurnManager : NetworkBehaviour
         rouletteDoneThisTurn = false;
         turnCardUsedThisTurn = false;
         avoidedEventsThisTurn.Clear();
+        engagedEventsThisTurn.Clear();
         WallWalk.Value = false;
         RestartDeadline();
         State.Value = TurnState.WaitingForRoll;
@@ -455,8 +458,13 @@ public class TurnManager : NetworkBehaviour
 
         Vector2Int cell = BoardManager.CellOf(tile);
 
+        // The dodge is decided once per tile and turn (passing over it and then the tile check
+        // must not roll twice).
         if (avoidedEventsThisTurn.Contains(cell))
             return false;
+
+        if (engagedEventsThisTurn.Contains(cell))
+            return true;
 
         if (ServerTryAvoidEntity(player))
         {
@@ -464,6 +472,7 @@ public class TurnManager : NetworkBehaviour
             return false;
         }
 
+        engagedEventsThisTurn.Add(cell);
         return true;
     }
 
