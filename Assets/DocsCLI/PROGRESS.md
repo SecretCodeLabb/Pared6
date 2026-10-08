@@ -64,6 +64,8 @@
 
 - **T21 (2026-10-07) Cartas especiales:** `SpecialCardEffect` (6 habilidades) + `CardRules` (cuándo se juega cada carta). Turno: `TurnManager.RequestPlayTurnCardRpc` (Silencio líquido, Cívica con `WallWalk`, Comida Frita). Combate: escape en `CombatManager` (Canicas / Gatos, fase `Escaped`). Pasiva: Salchipapa en `GameStateManager.ServerEliminate`. Estado `EventShieldTurns/Chance` en `PlayerNetworkData`. Probadas en Play: curar, esquivar entidad, Cívica 6 pasos a través de paredes, Canicas, Salchipapa. Gatos fotocopiados comparte código con Canicas (no probado en duelo real). 56 tests.
 
+- **T22 (2026-10-07) Cámara:** `BoardCameraController` sigue al jugador activo (offline: al peón), vista general en carga/fin, zoom con rueda y C para alternar. `MapGenerator` le pasa los límites del tablero.
+
 ## Problemas abiertos
 - Cliente cerrado a la fuerza: ~30 s hasta marcarse DESCONECTADO (timeout de Unity Transport; ajustable en `UnityTransport.DisconnectTimeoutMS`).
 - Timeout de turno implementado pero no probado (desactivado por defecto).

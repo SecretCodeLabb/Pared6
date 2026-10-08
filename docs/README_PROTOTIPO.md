@@ -116,6 +116,16 @@ En modo offline sin selección se usa `Room_01` en los 4 lados.
   (`SpecialCardEffect`: `chance`, `amount`, `turns`). PPOP/Create Example Cards ya no sobrescribe cartas existentes.
 - Si una carta no se puede usar en ese momento, el jugador recibe un aviso con cuándo se usa.
 
+## Cámara
+
+`BoardCameraController` (en la Main Camera de `Mapa`) mantiene el ángulo de la cámara y:
+- al empezar encuadra todo el tablero; luego **sigue al jugador del turno** (todos ven la acción);
+- en la carga y en la pantalla final vuelve a la **vista general**;
+- **rueda del ratón** = zoom, **C** = alternar seguimiento / vista general.
+Ajustes en el Inspector: `followDistance`, `minDistance`, `maxDistanceFactor`, `followOffset`
+(desplaza el punto seguido para que la mano de cartas no tape el peón), `overviewMargin`, `smoothTime`.
+Sin el componente, `MapGenerator.autoFrameCamera` encuadra el tablero como antes.
+
 ## Cómo añadir una carta
 
 1. Clic derecho en `Assets/ScriptableObjects/Cards/Cards` > Create > PPOP > Cards > **Card Data**.

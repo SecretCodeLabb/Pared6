@@ -215,6 +215,13 @@ public class MapGenerator : MonoBehaviour
         min = (min - Vector2.one * 0.5f) * tileSize;
         max = (max + Vector2.one * 0.5f) * tileSize;
 
+        // The game camera (follow / overview) takes over when present.
+        if (cam.TryGetComponent(out BoardCameraController controller))
+        {
+            controller.SetBoardBounds(min, max);
+            return;
+        }
+
         Vector3 center = new Vector3((min.x + max.x) * 0.5f, 0f, (min.y + max.y) * 0.5f);
         float halfX = (max.x - min.x) * 0.5f * cameraMargin;
         float halfZ = (max.y - min.y) * 0.5f * cameraMargin;
@@ -341,7 +348,7 @@ public class MapGenerator : MonoBehaviour
 
         TextMeshPro label = labelObject.AddComponent<TextMeshPro>();
         label.text = style.themeName;
-        label.fontSize = 14f;
+        label.fontSize = 9f;
         label.alignment = TextAlignmentOptions.Center;
         label.textWrappingMode = TextWrappingModes.NoWrap;
         label.color = style.themeLabelColor;

@@ -393,6 +393,12 @@ public static class PrototypeSetup
         GetOrAdd<CardManager>(network);
         GetOrAdd<RouletteManager>(network);
 
+        // Game camera: follows the active player, C toggles the overview, wheel zooms.
+        Camera mainCamera = Camera.main != null ? Camera.main : Object.FindFirstObjectByType<Camera>();
+
+        if (mainCamera != null)
+            GetOrAdd<BoardCameraController>(mainCamera.gameObject);
+
         SerializedObject so = new SerializedObject(state);
         so.FindProperty("boardManager").objectReferenceValue = board;
         so.FindProperty("mapGenerator").objectReferenceValue = map;

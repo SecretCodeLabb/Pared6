@@ -315,7 +315,7 @@ public class GameHUD : MonoBehaviour
         NetworkManager nm = NetworkManager.Singleton;
 
         if (nm != null)
-            networkText.text = (nm.IsHost ? "HOST" : "CLIENTE") + " · " + PlayerNetworkData.All.Count + " jugadores · Seed " + game.BoardSeed.Value;
+            networkText.text = "Rueda: zoom · C: vista general     " + (nm.IsHost ? "HOST" : "CLIENTE") + " · " + PlayerNetworkData.All.Count + " jugadores · Seed " + game.BoardSeed.Value;
     }
 
     private void RefreshTurn(TurnManager turns, PlayerNetworkData local)
