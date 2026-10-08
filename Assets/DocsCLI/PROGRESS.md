@@ -62,9 +62,11 @@
 
 - **T20 (2026-10-06) Habitaciones por personaje:** `RoomBuilder` con tema visual (tilePrefab, decorations, themeName); `CharacterData.roomPrefab`; `RoomThemeAssignment` (N, E, S, O en orden de jugador + relleno por semilla) sincronizado en `GameStateManager.RoomCharacterIds`; `MapGenerator` aplica estilo por lado y decora con RNG propio (paredes intactas, auditoría 0 discrepancias). 6 temas de ejemplo con primitivas. 48 tests.
 
-- **T21 (2026-10-07) Cartas especiales:** `SpecialCardEffect` (6 habilidades) + `CardRules` (cuándo se juega cada carta). Turno: `TurnManager.RequestPlayTurnCardRpc` (Silencio líquido, Cívica con `WallWalk`, Comida Frita). Combate: escape en `CombatManager` (Canicas / Gatos, fase `Escaped`). Pasiva: Salchipapa en `GameStateManager.ServerEliminate`. Estado `EventShieldTurns/Chance` en `PlayerNetworkData`. Probadas en Play: curar, esquivar entidad, Cívica 6 pasos a través de paredes, Canicas, Salchipapa. Gatos fotocopiados comparte código con Canicas (no probado en duelo real). 56 tests.
+- **T21 (2026-10-07) Cartas especiales:** `SpecialCardEffect` (6 habilidades) + `CardRules` (cuándo se juega cada carta). Turno: `TurnManager.RequestPlayTurnCardRpc` (Silencio líquido, Cívica con `WallWalk`, Comida Frita). Combate: escape en `CombatManager` (Canicas / Gatos, fase `Escaped`). Pasiva: Salchipapa en `GameStateManager.ServerEliminate`. Estado `EventShieldTurns/Chance` en `PlayerNetworkData`. Probadas en Play: curar, esquivar entidad, Cívica 6 pasos a través de paredes, Canicas, Salchipapa. Gatos fotocopiados comparte código con Canicas (no probado en duelo real). 52 tests.
 
 - **T22 (2026-10-07) Cámara:** `BoardCameraController` sigue al jugador activo (offline: al peón), vista general en carga/fin, zoom con rueda y C para alternar. `MapGenerator` le pasa los límites del tablero.
+
+- **T23 (2026-10-07) Nombre sobre el peón:** `PawnLabel` muestra el nombre del personaje elegido ("(tú)" en el propio); también en el peón offline (primer personaje de la selección local).
 
 ## Problemas abiertos
 - Cliente cerrado a la fuerza: ~30 s hasta marcarse DESCONECTADO (timeout de Unity Transport; ajustable en `UnityTransport.DisconnectTimeoutMS`).

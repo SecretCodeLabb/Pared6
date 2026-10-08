@@ -46,7 +46,7 @@ public class PlayerNetworkData : NetworkBehaviour
     public NetworkList<int> Hand;
 
     private PlayerController controller;
-    private TextMeshPro nameLabel;
+    private PawnLabel nameLabel;
     private Renderer[] renderers;
 
     public ulong OwnerClient => OwnerClientId;
@@ -353,28 +353,26 @@ public class PlayerNetworkData : NetworkBehaviour
         }
 
         if (nameLabel == null)
-        {
-            GameObject labelObject = new GameObject("NameLabel");
-            labelObject.transform.SetParent(transform, false);
-            labelObject.transform.localPosition = new Vector3(0f, 2.6f, 0f);
-            nameLabel = labelObject.AddComponent<TextMeshPro>();
-            nameLabel.alignment = TextAlignmentOptions.Center;
-            nameLabel.fontSize = 6f;
-            nameLabel.textWrappingMode = TextWrappingModes.NoWrap;
-            nameLabel.outlineWidth = 0.25f;
-            nameLabel.outlineColor = Color.black;
-        }
+            nameLabel = PawnLabel.AddTo(gameObject);
 
-        string characterName = data != null ? data.characterName : "?";
-        nameLabel.text = (IsOwner ? "<color=#FFD040>" : "") + Name + (IsOwner ? " (tú)</color>" : "") + "\n<size=70%>" + characterName;
-        nameLabel.color = Color.white;
+        // The pawn shows the chosen character's name; "(tú)" marks the local player.
+        nameLabel.SetText(LabelText());
     }
 
-    private void LateUpdate()
+    private string CharacterLabel
     {
-        // Billboard the label towards the camera.
-        if (nameLabel != null && Camera.main != null)
-            nameLabel.transform.rotation = Camera.main.transform.rotation;
+        get
+        {
+            CharacterData data = Character;
+            return data != null ? data.characterName : Name;
+        }
+    }
+
+    private string LabelText()
+    {
+        return IsOwner
+            ? "<color=#FFD040><b>" + CharacterLabel + "</b> <size=70%>(tú)</size></color>"
+            : "<b>" + CharacterLabel + "</b>";
     }
 
     private void ApplyStateVisual()
@@ -399,10 +397,10 @@ public class PlayerNetworkData : NetworkBehaviour
 
         if (nameLabel != null)
         {
-            nameLabel.gameObject.SetActive(visible);
+            nameLabel.SetVisible(visible);
 
             if (dimmed)
-                nameLabel.text = Name + "\n<color=#FF5050>ELIMINADO</color>";
+                nameLabel.SetText(CharacterLabel + "\n<color=#FF5050>ELIMINADO</color>");
         }
     }
 

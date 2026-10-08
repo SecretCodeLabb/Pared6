@@ -247,6 +247,13 @@ public class BoardManager : MonoBehaviour
             startTile,
             this
         );
+
+        // Offline: the pawn shows the first character picked in the local selection.
+        if (GameSession.Instance != null && GameSession.Instance.Players.Count > 0 &&
+            GameSession.Instance.Players[0].characterData != null)
+        {
+            PawnLabel.AddTo(playerObject).SetText("<b>" + GameSession.Instance.Players[0].characterData.characterName + "</b>");
+        }
     }
 
     // =========================================================
