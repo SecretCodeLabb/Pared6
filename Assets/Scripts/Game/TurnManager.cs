@@ -32,6 +32,13 @@ public class TurnManager : NetworkBehaviour
 
     // One roulette spin per turn (extra moves from the wheel do not spin it again).
     private bool rouletteDoneThisTurn;
+
+    /// <summary>Special card "Cívica": the current movement ignores walls.</summary>
+    public NetworkVariable<bool> WallWalk = new NetworkVariable<bool>(false);
+
+    // One own-turn special card per turn; event cells dodged this turn are not re-triggered.
+    private bool turnCardUsedThisTurn;
+    private readonly HashSet<Vector2Int> avoidedEventsThisTurn = new HashSet<Vector2Int>();
     // Status effects tick once per turn even if ServerEndTurn is reached twice.
     private int effectsTickedTurn = -1;
 
@@ -178,6 +185,9 @@ public class TurnManager : NetworkBehaviour
         MovesRemaining.Value = 0;
         TurnNumber.Value++;
         rouletteDoneThisTurn = false;
+        turnCardUsedThisTurn = false;
+        avoidedEventsThisTurn.Clear();
+        WallWalk.Value = false;
         RestartDeadline();
         State.Value = TurnState.WaitingForRoll;
     }
@@ -375,7 +385,11 @@ public class TurnManager : NetworkBehaviour
         }
 
         Tile current = Board.GetTile(player.GridPosition.Value);
-        Tile next = Board.GetNeighbor(current, direction);
+
+        // "Cívica" ignores walls but never leaves the board.
+        Tile next = WallWalk.Value
+            ? Board.GetTile(player.GridPosition.Value + direction)
+            : Board.GetNeighbor(current, direction);
 
         if (next == null || !next.walkable)
         {
@@ -388,18 +402,75 @@ public class TurnManager : NetworkBehaviour
         MovesRemaining.Value--;
 
         // Walking onto another player or (optionally) an active event stops the movement there.
-        bool encounter = FindOpponentAt(player, player.GridPosition.Value) != null ||
-                         (Rules.eventsTriggerWhenPassing && GameStateManager.Instance.Events.HasActiveEvent(next));
+        bool eventAhead = Rules.eventsTriggerWhenPassing && IsLiveEventFor(player, next);
+        bool encounter = FindOpponentAt(player, player.GridPosition.Value) != null || eventAhead;
 
         if (encounter && MovesRemaining.Value > 0)
             Debug.Log($"{NetworkConnectionManager.GetInstanceTag()} {player.Name}: movimiento detenido por un encuentro en {player.GridPosition.Value} ({MovesRemaining.Value} pasos sin usar)");
 
-        if (encounter || MovesRemaining.Value <= 0 || !Board.HasAnyValidMove(next))
+        if (encounter || MovesRemaining.Value <= 0 || !HasAnyStep(next))
             ServerFinishMovement(player);
+    }
+
+    private bool HasAnyStep(Tile tile)
+    {
+        if (tile == null)
+            return false;
+
+        if (!WallWalk.Value)
+            return Board.HasAnyValidMove(tile);
+
+        foreach (Vector2Int d in BoardLayout.Directions)
+        {
+            if (Board.GetTile(tile.gridPosition + d) != null)
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// True if an active event on this tile will fight the player. A player under "Silencio líquido"
+    /// rolls once per event tile per turn to dodge it (the event stays on the board).
+    /// </summary>
+    private bool IsLiveEventFor(PlayerNetworkData player, Tile tile)
+    {
+        if (!GameStateManager.Instance.Events.HasActiveEvent(tile))
+            return false;
+
+        Vector2Int cell = BoardManager.CellOf(tile);
+
+        if (avoidedEventsThisTurn.Contains(cell))
+            return false;
+
+        if (ServerTryAvoidEntity(player))
+        {
+            avoidedEventsThisTurn.Add(cell);
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>"Silencio líquido" chance roll against an entity fight (event or forced fight).</summary>
+    private bool ServerTryAvoidEntity(PlayerNetworkData player)
+    {
+        if (player.EventShieldTurns.Value <= 0)
+            return false;
+
+        if (!SpecialCardEffect.Succeeds(player.EventShieldChance.Value, UnityEngine.Random.value))
+        {
+            GameStateManager.Instance.ServerBroadcast($"{player.Name} no logra esquivar a la entidad");
+            return false;
+        }
+
+        GameStateManager.Instance.ServerBroadcast($"{player.Name} esquiva a la entidad en silencio");
+        return true;
     }
 
     private void ServerFinishMovement(PlayerNetworkData player)
     {
+        WallWalk.Value = false;
         MovesRemaining.Value = 0;
         State.Value = TurnState.CheckingTile;
 
@@ -431,7 +502,7 @@ public class TurnManager : NetworkBehaviour
             RestartDeadline();
             CombatManager.Instance.ServerBeginDuel(player, opponent);
         }
-        else if (GameStateManager.Instance.Events.HasActiveEvent(tile) && CombatManager.Instance != null)
+        else if (CombatManager.Instance != null && IsLiveEventFor(player, tile))
         {
             State.Value = TurnState.Combat;
             RestartDeadline();
@@ -480,9 +551,114 @@ public class TurnManager : NetworkBehaviour
             return;
         }
 
+        if (ServerTryAvoidEntity(player))
+        {
+            ServerEndTurn();
+            return;
+        }
+
         State.Value = TurnState.Combat;
         RestartDeadline();
         CombatManager.Instance.ServerBeginCombat(player, player.GridPosition.Value, true);
+    }
+
+    // =========================================================
+    // SPECIAL CARDS PLAYED ON THE OWN TURN
+    // =========================================================
+
+    /// <summary>The local player can play this hand card now (own turn, before rolling).</summary>
+    public bool CanLocalPlayTurnCard(int handIndex)
+    {
+        PlayerNetworkData local = PlayerNetworkData.Local;
+
+        // One card per turn is enforced by the Host (it answers with a message).
+        if (!CanLocalPlayerRoll() || local.CardsBlocked)
+            return false;
+
+        if (handIndex < 0 || handIndex >= local.Hand.Count)
+            return false;
+
+        return CardRules.CanPlayOnOwnTurn(CardDatabase.Instance.GetById(local.Hand[handIndex]));
+    }
+
+    public void RequestPlayTurnCardFromLocal(int handIndex)
+    {
+        if (!CanLocalPlayTurnCard(handIndex))
+            return;
+
+        RequestPlayTurnCardRpc(handIndex, PlayerNetworkData.Local.Hand[handIndex]);
+    }
+
+    [Rpc(SendTo.Server)]
+    private void RequestPlayTurnCardRpc(int handIndex, int cardId, RpcParams rpcParams = default)
+    {
+        ulong sender = rpcParams.Receive.SenderClientId;
+
+        if (!ValidateActivePlayer(sender, TurnState.WaitingForRoll, out PlayerNetworkData player, "PlayTurnCard"))
+            return;
+
+        GameStateManager game = GameStateManager.Instance;
+
+        if (turnCardUsedThisTurn)
+        {
+            game.ServerMessageTo(sender, "Solo puedes usar una carta especial por turno.");
+            return;
+        }
+
+        if (player.CardsBlocked)
+        {
+            game.ServerMessageTo(sender, "La ruleta te impide usar cartas este turno.");
+            return;
+        }
+
+        if (handIndex < 0 || handIndex >= player.Hand.Count || player.Hand[handIndex] != cardId)
+        {
+            Debug.LogWarning($"TurnManager: card {cardId} not at index {handIndex} in {player.Name}'s hand.");
+            return;
+        }
+
+        CardData card = CardDatabase.Instance.GetById(cardId);
+        SpecialCardEffect special = card != null ? card.effect as SpecialCardEffect : null;
+
+        if (special == null || special.Timing != CardTiming.OwnTurn)
+        {
+            game.ServerMessageTo(sender, card != null ? CardRules.TimingHint(card) : "Carta desconocida.");
+            return;
+        }
+
+        if (special.ability == SpecialAbility.Heal && player.Lives.Value >= Rules.startingLives)
+        {
+            game.ServerMessageTo(sender, "Ya tienes todas tus vidas.");
+            return;
+        }
+
+        player.ServerRemoveCardAt(handIndex);
+        turnCardUsedThisTurn = true;
+        game.ServerBroadcast($"{player.Name} usó {card.displayName}");
+
+        switch (special.ability)
+        {
+            case SpecialAbility.AvoidEvents:
+                player.EventShieldChance.Value = special.chance;
+                player.EventShieldTurns.Value = Mathf.Max(player.EventShieldTurns.Value, special.turns);
+                break;
+
+            case SpecialAbility.Heal:
+                player.Lives.Value = Mathf.Min(Rules.startingLives, player.Lives.Value + Mathf.Max(1, special.amount));
+                break;
+
+            case SpecialAbility.WallWalk:
+                // Replaces the roll: exactly 'amount' steps through walls.
+                LastRoll.Value = 0;
+                WallWalk.Value = true;
+                MovesRemaining.Value = Mathf.Max(1, special.amount);
+                State.Value = TurnState.Moving;
+                RestartDeadline();
+
+                if (!HasAnyStep(Board.GetTile(player.GridPosition.Value)))
+                    ServerFinishMovement(player);
+                break;
+        }
     }
 
     /// <summary>Lowest-PlayerId Alive opponent standing on the cell, or null (duels disabled = always null).</summary>

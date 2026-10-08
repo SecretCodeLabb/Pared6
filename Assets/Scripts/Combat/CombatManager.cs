@@ -271,6 +271,21 @@ public class CombatManager : NetworkBehaviour
             return;
         }
 
+        // Special cards only work in their own kind of fight (or outside combat).
+        bool playable = IsDuel.Value ? CardRules.CanPlayInDuel(card) : CardRules.CanPlayInEventCombat(card);
+
+        if (!playable)
+        {
+            GameStateManager.Instance.ServerMessageTo(rpcParams.Receive.SenderClientId, $"{card.displayName}: {CardRules.TimingHint(card)}");
+            return;
+        }
+
+        if (card.effect is SpecialCardEffect escape)
+        {
+            ServerPlayEscapeCard(player, side, sideContext, handIndex, card, escape);
+            return;
+        }
+
         player.ServerRemoveCardAt(handIndex);
         card.Apply(sideContext);
         sideContext.CardsUsed++;
@@ -279,6 +294,41 @@ public class CombatManager : NetworkBehaviour
         LastCardText.Value = $"{player.Name} usó {card.displayName}";
         SyncContext();
         GameStateManager.Instance.ServerBroadcast($"{player.Name} usó {card.displayName}");
+
+        if (!IsDuel.Value && context.CardsUsed >= Rules.maxCardsPerCombat)
+            Phase.Value = CombatPhase.Rolling;
+    }
+
+    /// <summary>
+    /// "Canicas" (event) / "Gatos fotocopiados" (duel): chance to leave the fight with no result.
+    /// The card is consumed either way; on failure the fight goes on.
+    /// </summary>
+    private void ServerPlayEscapeCard(PlayerNetworkData player, Side side, CombatContext sideContext, int handIndex, CardData card, SpecialCardEffect escape)
+    {
+        player.ServerRemoveCardAt(handIndex);
+        sideContext.CardsUsed++;
+        sideContext.AppliedCards.Add(card.displayName);
+
+        bool escaped = SpecialCardEffect.Succeeds(escape.chance, UnityEngine.Random.value);
+
+        if (escaped)
+        {
+            string what = IsDuel.Value ? "del duelo" : "de la entidad";
+            LastCardText.Value = $"¡{player.Name} escapó {what} con {card.displayName}!";
+            SyncContext();
+            GameStateManager.Instance.ServerBroadcast($"¡{player.Name} escapó {what}! ({card.displayName})");
+
+            // No damage, no progress; an event tile keeps its event.
+            LifeLoss.Value = 0;
+            DefenderLifeLoss.Value = 0;
+            Phase.Value = CombatPhase.Escaped;
+            finishRoutine = StartCoroutine(FinishAfterDelay());
+            return;
+        }
+
+        LastCardText.Value = $"{player.Name} usó {card.displayName}... ¡pero no logró escapar!";
+        SyncContext();
+        GameStateManager.Instance.ServerBroadcast($"{player.Name} no logró escapar ({card.displayName})");
 
         if (!IsDuel.Value && context.CardsUsed >= Rules.maxCardsPerCombat)
             Phase.Value = CombatPhase.Rolling;

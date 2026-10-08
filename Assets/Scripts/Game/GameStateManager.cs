@@ -290,6 +290,19 @@ public class GameStateManager : NetworkBehaviour
         MessageReceived?.Invoke(message);
     }
 
+    /// <summary>Host only: shows a message to one client (e.g. why a card could not be used).</summary>
+    public void ServerMessageTo(ulong clientId, string message)
+    {
+        if (IsServer)
+            ShowPrivateMessageRpc(message, RpcTarget.Single(clientId, RpcTargetUse.Temp));
+    }
+
+    [Rpc(SendTo.SpecifiedInParams)]
+    private void ShowPrivateMessageRpc(string message, RpcParams rpcParams = default)
+    {
+        MessageReceived?.Invoke(message);
+    }
+
     // =========================================================
     // EVENTS / PROGRESS / VICTORY (T09-T14)
     // =========================================================
@@ -350,6 +363,20 @@ public class GameStateManager : NetworkBehaviour
     {
         if (player.State.Value != PlayerLifeState.Alive)
             return;
+
+        // Special card "Salchipapa": consumed by itself to revive instead of being eliminated.
+        int reviveIndex = player.FindCardIndex(card => card.effect is SpecialCardEffect s && s.ability == SpecialAbility.Revive);
+
+        if (reviveIndex >= 0)
+        {
+            CardData card = CardDatabase.Instance.GetById(player.Hand[reviveIndex]);
+            int lives = Mathf.Max(1, ((SpecialCardEffect)card.effect).amount);
+
+            player.ServerRemoveCardAt(reviveIndex);
+            player.Lives.Value = lives;
+            ServerBroadcast($"¡{player.Name} revive con {card.displayName}! ({lives} vida)");
+            return;
+        }
 
         player.State.Value = PlayerLifeState.Eliminated;
         ServerBroadcast($"{player.Name} ha sido ELIMINADO");

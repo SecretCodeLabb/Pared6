@@ -512,3 +512,64 @@ public class RoomThemeAssignmentTests
         CollectionAssert.AllItemsAreUnique(sides);
     }
 }
+
+public class SpecialCardTests
+{
+    private static CardData Card(SpecialAbility? ability)
+    {
+        var card = ScriptableObject.CreateInstance<CardData>();
+        if (ability.HasValue)
+        {
+            var effect = ScriptableObject.CreateInstance<SpecialCardEffect>();
+            effect.ability = ability.Value;
+            card.effect = effect;
+        }
+        return card;
+    }
+
+    [Test]
+    public void TimingPerAbility()
+    {
+        Assert.IsTrue(CardRules.CanPlayOnOwnTurn(Card(SpecialAbility.AvoidEvents)));
+        Assert.IsTrue(CardRules.CanPlayOnOwnTurn(Card(SpecialAbility.WallWalk)));
+        Assert.IsTrue(CardRules.CanPlayOnOwnTurn(Card(SpecialAbility.Heal)));
+
+        Assert.IsTrue(CardRules.CanPlayInDuel(Card(SpecialAbility.EscapeDuel)));
+        Assert.IsFalse(CardRules.CanPlayInEventCombat(Card(SpecialAbility.EscapeDuel)));
+
+        Assert.IsTrue(CardRules.CanPlayInEventCombat(Card(SpecialAbility.EscapeEvent)));
+        Assert.IsFalse(CardRules.CanPlayInDuel(Card(SpecialAbility.EscapeEvent)));
+
+        var revive = Card(SpecialAbility.Revive);
+        Assert.IsFalse(CardRules.CanPlayOnOwnTurn(revive));
+        Assert.IsFalse(CardRules.CanPlayInDuel(revive));
+        Assert.IsFalse(CardRules.CanPlayInEventCombat(revive));
+    }
+
+    [Test]
+    public void NormalCardsOnlyInCombat()
+    {
+        var plain = Card(null);
+        Assert.IsTrue(CardRules.CanPlayInEventCombat(plain));
+        Assert.IsTrue(CardRules.CanPlayInDuel(plain));
+        Assert.IsFalse(CardRules.CanPlayOnOwnTurn(plain));
+    }
+
+    [Test]
+    public void ChanceRoll()
+    {
+        Assert.IsTrue(SpecialCardEffect.Succeeds(0.65f, 0.64));
+        Assert.IsFalse(SpecialCardEffect.Succeeds(0.65f, 0.65));
+        Assert.IsTrue(SpecialCardEffect.Succeeds(0.85f, 0.0));
+        Assert.IsFalse(SpecialCardEffect.Succeeds(0f, 0.0));
+    }
+
+    [Test]
+    public void SpecialCardsDoNotChangeTheRoll()
+    {
+        var ctx = new CombatContext(0, 4, 1) { Roll = 3 };
+        Card(SpecialAbility.EscapeEvent).Apply(ctx);
+        Assert.AreEqual(3, ctx.Result);
+        Assert.AreEqual(4, ctx.Required);
+    }
+}

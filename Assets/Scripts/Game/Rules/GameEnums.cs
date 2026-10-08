@@ -34,5 +34,6 @@ public enum CombatPhase : byte
     Resolving,
     Won,
     Lost,
-    Draw
+    Draw,
+    Escaped
 }

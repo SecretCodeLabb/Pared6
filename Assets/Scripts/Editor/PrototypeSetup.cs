@@ -197,9 +197,31 @@ public static class PrototypeSetup
             EnsureCard(4, "Escudo -1", "Escudo_1", defense, "Resta 1 al daño recibido en este combate.", def1),
             EnsureCard(5, "Escudo -2", "Escudo_2", defense, "Resta 2 al daño recibido en este combate.", def2),
             EnsureCard(6, "Escudo -3", "Escudo_3", defense, "Resta 3 al daño recibido en este combate.", def3),
-            EnsureCard(7, "Truco del oficio", "Truco", ability, "Habilidad especial. Todavía no tiene efecto.", null),
-            EnsureCard(8, "Piedra brillante", "Piedra", useless, "No sirve para nada... ¿o sí?", null)
+            EnsureCard(8, "Piedra brillante", "Piedra", useless, "No sirve para nada... ¿o sí?", null),
+
+            // Special (purple) cards. Name, description, icon and values are editable on the assets.
+            EnsureCard(9, "Silencio líquido", "SilencioLiquido", ability,
+                "Durante 2 turnos tienes un 85% de evitar los combates contra entidades.",
+                EnsureSpecial("SilencioLiquido", SpecialAbility.AvoidEvents, 0, 0.85f, 2)),
+            EnsureCard(10, "Cívica", "Civica", ability,
+                "En vez de tirar, muévete exactamente 6 casillas en cualquier dirección atravesando paredes.",
+                EnsureSpecial("Civica", SpecialAbility.WallWalk, 6, 1f, 1)),
+            EnsureCard(11, "Comida Frita", "ComidaFrita", ability,
+                "Te cura una vida.",
+                EnsureSpecial("ComidaFrita", SpecialAbility.Heal, 1, 1f, 1)),
+            EnsureCard(12, "Gatos fotocopiados", "GatosFotocopiados", ability,
+                "En un duelo contra otro jugador: 65% de probabilidad de escapar.",
+                EnsureSpecial("GatosFotocopiados", SpecialAbility.EscapeDuel, 0, 0.65f, 1)),
+            EnsureCard(13, "Salchipapa", "Salchipapa", ability,
+                "Si pierdes todas tus vidas y tienes esta carta, revives con 1 vida.",
+                EnsureSpecial("Salchipapa", SpecialAbility.Revive, 1, 1f, 1)),
+            EnsureCard(14, "Canicas", "Canicas", ability,
+                "En un combate contra una entidad: 65% de probabilidad de escapar.",
+                EnsureSpecial("Canicas", SpecialAbility.EscapeEvent, 0, 0.65f, 1))
         };
+
+        // The old placeholder special card is replaced by the real ones.
+        CardData oldTrick = AssetDatabase.LoadAssetAtPath<CardData>(CardsDir + "/Cards/Card_07_Truco.asset");
 
         string dbPath = ResourcesDir + "/Cards/CardDatabase.asset";
         CardDatabase database = AssetDatabase.LoadAssetAtPath<CardDatabase>(dbPath);
@@ -209,6 +231,9 @@ public static class PrototypeSetup
             database = ScriptableObject.CreateInstance<CardDatabase>();
             AssetDatabase.CreateAsset(database, dbPath);
         }
+
+        if (oldTrick != null)
+            database.cards.Remove(oldTrick);
 
         foreach (CardData card in cards)
         {
@@ -265,19 +290,35 @@ public static class PrototypeSetup
         string path = CardsDir + "/Cards/Card_" + id.ToString("00") + "_" + fileName + ".asset";
         CardData card = AssetDatabase.LoadAssetAtPath<CardData>(path);
 
-        if (card == null)
-        {
-            card = ScriptableObject.CreateInstance<CardData>();
-            AssetDatabase.CreateAsset(card, path);
-        }
+        // Existing cards keep whatever you edited (name, description, icon, type, effect).
+        if (card != null)
+            return card;
 
+        card = ScriptableObject.CreateInstance<CardData>();
         card.id = id;
         card.displayName = displayName;
         card.type = type;
         card.description = description;
         card.effect = effect;
-        EditorUtility.SetDirty(card);
+        AssetDatabase.CreateAsset(card, path);
         return card;
+    }
+
+    private static SpecialCardEffect EnsureSpecial(string assetName, SpecialAbility ability, int amount, float chance, int turns)
+    {
+        string path = CardsDir + "/Effects/Effect_Special_" + assetName + ".asset";
+        SpecialCardEffect effect = AssetDatabase.LoadAssetAtPath<SpecialCardEffect>(path);
+
+        if (effect != null)
+            return effect;
+
+        effect = ScriptableObject.CreateInstance<SpecialCardEffect>();
+        effect.ability = ability;
+        effect.amount = amount;
+        effect.chance = chance;
+        effect.turns = turns;
+        AssetDatabase.CreateAsset(effect, path);
+        return effect;
     }
 
     public static void RegisterNetworkPrefab(GameObject prefab)

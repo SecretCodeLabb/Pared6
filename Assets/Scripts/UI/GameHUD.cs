@@ -37,6 +37,7 @@ public class GameHUD : MonoBehaviour
     private TextMeshProUGUI toastText;
     private TextMeshProUGUI networkText;
     private Button rollTextButton;
+    private Button turnCardButton;
     private readonly List<Button> moveButtons = new List<Button>();
 
     private GameObject handPanel;
@@ -174,7 +175,7 @@ public class GameHUD : MonoBehaviour
     private void BuildActionsPanel(Transform root)
     {
         Image panel = UIFactory.CreatePanel(root, "ActionsPanel", UIFactory.PanelColor);
-        UIFactory.Place(panel.rectTransform, new Vector2(0f, 0f), new Vector2(12f, 12f), new Vector2(330f, 330f));
+        UIFactory.Place(panel.rectTransform, new Vector2(0f, 0f), new Vector2(12f, 12f), new Vector2(330f, 392f));
 
         livesText = UIFactory.CreateText(panel.transform, "LivesText", "", 30f);
         UIFactory.Place(livesText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -8f), new Vector2(310f, 44f));
@@ -182,13 +183,17 @@ public class GameHUD : MonoBehaviour
         rollTextButton = UIFactory.CreateButton(panel.transform, "RollDiceButton", "TIRAR DADO", OnRollClicked, UIFactory.ButtonColor, 28f);
         UIFactory.Place((RectTransform)rollTextButton.transform, new Vector2(0.5f, 1f), new Vector2(0f, -60f), new Vector2(300f, 64f));
 
-        TextMeshProUGUI moveLabel = UIFactory.CreateText(panel.transform, "MoveLabel", "MOVER (WASD / flechas)", 18f);
-        UIFactory.Place(moveLabel.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -132f), new Vector2(300f, 26f));
+        // Special cards played on the own turn (Silencio líquido, Cívica, Comida Frita).
+        turnCardButton = UIFactory.CreateButton(panel.transform, "TurnCardButton", "USAR CARTA ESPECIAL", OnTurnCardClicked, new Color(0.45f, 0.18f, 0.70f), 20f);
+        UIFactory.Place((RectTransform)turnCardButton.transform, new Vector2(0.5f, 1f), new Vector2(0f, -132f), new Vector2(300f, 50f));
 
-        AddMoveButton(panel.transform, "↑", Vector2Int.up, new Vector2(0f, -164f));
-        AddMoveButton(panel.transform, "←", Vector2Int.left, new Vector2(-80f, -224f));
-        AddMoveButton(panel.transform, "→", Vector2Int.right, new Vector2(80f, -224f));
-        AddMoveButton(panel.transform, "↓", Vector2Int.down, new Vector2(0f, -264f));
+        TextMeshProUGUI moveLabel = UIFactory.CreateText(panel.transform, "MoveLabel", "MOVER (WASD / flechas)", 18f);
+        UIFactory.Place(moveLabel.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -194f), new Vector2(300f, 26f));
+
+        AddMoveButton(panel.transform, "↑", Vector2Int.up, new Vector2(0f, -226f));
+        AddMoveButton(panel.transform, "←", Vector2Int.left, new Vector2(-80f, -286f));
+        AddMoveButton(panel.transform, "→", Vector2Int.right, new Vector2(80f, -286f));
+        AddMoveButton(panel.transform, "↓", Vector2Int.down, new Vector2(0f, -326f));
     }
 
     private void AddMoveButton(Transform parent, string label, Vector2Int direction, Vector2 position)
@@ -342,7 +347,10 @@ public class GameHUD : MonoBehaviour
         switch (turns.State.Value)
         {
             case TurnState.WaitingForRoll: hint = turns.IsLocalPlayersTurn ? "Pulsa TIRAR DADO" : "Esperando la tirada"; break;
-            case TurnState.Moving: hint = turns.IsLocalPlayersTurn ? $"Muévete con WASD / flechas · {turns.MovesRemaining.Value} restantes" : $"Moviéndose · {turns.MovesRemaining.Value} restantes"; break;
+            case TurnState.Moving:
+                hint = turns.IsLocalPlayersTurn ? $"Muévete con WASD / flechas · {turns.MovesRemaining.Value} restantes" : $"Moviéndose · {turns.MovesRemaining.Value} restantes";
+                if (turns.WallWalk.Value) hint += " · <color=#D080FF>atraviesa paredes</color>";
+                break;
             case TurnState.CheckingTile: hint = "Comprobando casilla..."; break;
             case TurnState.Combat: hint = CombatManager.Instance != null && CombatManager.Instance.IsDuel.Value ? "¡Duelo en curso!" : "¡Combate en curso!"; break;
             case TurnState.TurnEnd: hint = "Fin del turno"; break;
@@ -413,6 +421,9 @@ public class GameHUD : MonoBehaviour
         bool canRoll = turns.CanLocalPlayerRoll();
         bool canMove = turns.CanLocalPlayerMove();
         SetActionButtons(canRoll, canMove);
+
+        if (turnCardButton != null)
+            turnCardButton.interactable = turns.CanLocalPlayTurnCard(selectedHandIndex);
     }
 
     private void SetActionButtons(bool canRoll, bool canMove)
@@ -443,7 +454,16 @@ public class GameHUD : MonoBehaviour
             RebuildHand(local);
 
         bool canUse = CombatManager.Instance != null && CombatManager.Instance.CanLocalUseCard();
-        handTitle.text = canUse ? "MIS CARTAS — elige una y pulsa USAR CARTA" : "MIS CARTAS";
+        bool canTurnCard = TurnManager.Instance != null && TurnManager.Instance.CanLocalPlayTurnCard(selectedHandIndex);
+
+        if (canUse)
+            handTitle.text = "MIS CARTAS — elige una y pulsa USAR CARTA";
+        else if (canTurnCard)
+            handTitle.text = "MIS CARTAS — pulsa USAR CARTA ESPECIAL";
+        else if (selectedHandIndex >= 0 && selectedHandIndex < local.Hand.Count)
+            handTitle.text = "MIS CARTAS — " + CardRules.TimingHint(CardDatabase.Instance.GetById(local.Hand[selectedHandIndex]));
+        else
+            handTitle.text = "MIS CARTAS";
 
         for (int i = 0; i < handCardGlows.Count; i++)
             handCardGlows[i].SetActive(i == selectedHandIndex);
@@ -586,7 +606,7 @@ public class GameHUD : MonoBehaviour
 
         CombatPhase phase = combat.Phase.Value;
 
-        if (phase == CombatPhase.Won || phase == CombatPhase.Lost || phase == CombatPhase.Resolving)
+        if ((phase == CombatPhase.Won || phase == CombatPhase.Lost || phase == CombatPhase.Resolving) && combat.Roll.Value > 0)
             body.Append($"\nTirada {RollText(combat.Roll.Value, combat.RollModifier.Value)} vs {combat.Required.Value}");
         else if (combat.RollModifier.Value != 0)
             body.Append($"\nBonus a la tirada: {Signed(combat.RollModifier.Value)}");
@@ -595,6 +615,9 @@ public class GameHUD : MonoBehaviour
 
         switch (phase)
         {
+            case CombatPhase.Escaped:
+                combatResult.text = "<color=#80C0FF>¡ESCAPÓ DE LA ENTIDAD!</color>";
+                break;
             case CombatPhase.Won:
                 combatResult.text = "<color=#60FF60>¡SUPERASTE EL EVENTO!</color>";
                 break;
@@ -646,6 +669,9 @@ public class GameHUD : MonoBehaviour
                 break;
             case CombatPhase.Lost:
                 combatResult.text = $"<color=#60FF60>¡GANA {defenderName}!</color>" + LossText(attackerName, combat.LifeLoss.Value);
+                break;
+            case CombatPhase.Escaped:
+                combatResult.text = "<color=#80C0FF>¡ESCAPÓ DEL DUELO!</color> <size=60%>nadie pierde vida</size>";
                 break;
             case CombatPhase.Draw:
                 combatResult.text = "<color=#FFD040>¡EMPATE!</color> <size=60%>nadie pierde vida</size>";
@@ -835,6 +861,15 @@ public class GameHUD : MonoBehaviour
             return;
 
         CombatManager.Instance.RequestUseCardFromLocal(selectedHandIndex, local.Hand[selectedHandIndex]);
+        selectedHandIndex = -1;
+    }
+
+    private void OnTurnCardClicked()
+    {
+        if (TurnManager.Instance == null)
+            return;
+
+        TurnManager.Instance.RequestPlayTurnCardFromLocal(selectedHandIndex);
         selectedHandIndex = -1;
     }
 

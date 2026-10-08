@@ -99,6 +99,23 @@ cambia materiales/modelos de `RoomTile_<Personaje>` y la lista `decorations` de 
 El tamaño de las habitaciones y la densidad de caminos salen de `Room_01` (asignado en `MapGenerator`).
 En modo offline sin selección se usa `Room_01` en los 4 lados.
 
+## Cartas especiales (moradas)
+
+| Carta | Cuándo se usa | Efecto |
+|---|---|---|
+| Silencio líquido | Tu turno, antes de tirar (botón **USAR CARTA ESPECIAL**) | Durante 2 turnos (el actual y el siguiente), 85% de esquivar cada combate contra entidades (casillas de evento y "¡Pelea!" de la ruleta). El evento esquivado sigue en el tablero. |
+| Cívica | Tu turno, en lugar de tirar | Te mueves exactamente 6 casillas en cualquier dirección atravesando paredes (sin salir del tablero). Pasar por un evento o un jugador sigue deteniendo el movimiento. |
+| Comida Frita | Tu turno, antes de tirar | +1 vida, hasta el máximo inicial (`GameRules.startingLives`). Con las vidas llenas no se gasta. |
+| Gatos fotocopiados | Fase de cartas de un duelo (atacante o defensor) | 65% de escapar: el duelo termina sin daño. Si falla, la carta se gasta y el duelo sigue. |
+| Salchipapa | Pasiva | Al llegar a 0 vidas se consume sola y revives con 1 vida. |
+| Canicas | Fase de cartas de un combate contra entidad | 65% de escapar sin daño (el evento no se consume). Si falla, se gasta y el combate sigue. |
+
+- Máximo **una carta especial por turno** fuera de combate; "Sin cartas" de la ruleta también las bloquea.
+- **Editable sin código:** nombre, descripción e imagen (`icon`) en `ScriptableObjects/Cards/Cards/Card_09..14_*`;
+  probabilidad, casillas, vidas y turnos en `ScriptableObjects/Cards/Effects/Effect_Special_*`
+  (`SpecialCardEffect`: `chance`, `amount`, `turns`). PPOP/Create Example Cards ya no sobrescribe cartas existentes.
+- Si una carta no se puede usar en ese momento, el jugador recibe un aviso con cuándo se usa.
+
 ## Cómo añadir una carta
 
 1. Clic derecho en `Assets/ScriptableObjects/Cards/Cards` > Create > PPOP > Cards > **Card Data**.

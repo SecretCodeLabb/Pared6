@@ -38,6 +38,10 @@ public class PlayerNetworkData : NetworkBehaviour
     public NetworkVariable<int> DamagePenalty = new NetworkVariable<int>(0);
     public NetworkVariable<int> DamagePenaltyTurns = new NetworkVariable<int>(0);
 
+    // Special card "Silencio líquido": chance to dodge fights against entities while turns > 0.
+    public NetworkVariable<int> EventShieldTurns = new NetworkVariable<int>(0);
+    public NetworkVariable<float> EventShieldChance = new NetworkVariable<float>(0f);
+
     /// <summary>Card ids. Only the owner (and the Host) receive it; others see HandCount.</summary>
     public NetworkList<int> Hand;
 
@@ -154,6 +158,7 @@ public class PlayerNetworkData : NetworkBehaviour
         SkipTurns.OnValueChanged += OnIntChanged;
         CardsBlockedTurns.OnValueChanged += OnIntChanged;
         DamagePenaltyTurns.OnValueChanged += OnIntChanged;
+        EventShieldTurns.OnValueChanged += OnIntChanged;
         State.OnValueChanged += OnStateChanged;
         GridPosition.OnValueChanged += OnGridPositionChanged;
         Hand.OnListChanged += OnHandChanged;
@@ -181,6 +186,7 @@ public class PlayerNetworkData : NetworkBehaviour
         SkipTurns.OnValueChanged -= OnIntChanged;
         CardsBlockedTurns.OnValueChanged -= OnIntChanged;
         DamagePenaltyTurns.OnValueChanged -= OnIntChanged;
+        EventShieldTurns.OnValueChanged -= OnIntChanged;
         State.OnValueChanged -= OnStateChanged;
         GridPosition.OnValueChanged -= OnGridPositionChanged;
         Hand.OnListChanged -= OnHandChanged;
@@ -238,6 +244,9 @@ public class PlayerNetworkData : NetworkBehaviour
         if (CardsBlockedTurns.Value > 0)
             CardsBlockedTurns.Value--;
 
+        if (EventShieldTurns.Value > 0)
+            EventShieldTurns.Value--;
+
         if (DamagePenaltyTurns.Value > 0)
         {
             DamagePenaltyTurns.Value--;
@@ -256,8 +265,23 @@ public class PlayerNetworkData : NetworkBehaviour
         if (MovePenalty.Value > 0) parts.Add("-" + MovePenalty.Value + " mov");
         if (CardsBlocked) parts.Add("sin cartas");
         if (ActiveDamagePenalty > 0) parts.Add("-" + ActiveDamagePenalty + " daño");
+        if (EventShieldTurns.Value > 0) parts.Add("esquiva " + Mathf.RoundToInt(EventShieldChance.Value * 100f) + "%");
 
         return string.Join(" · ", parts);
+    }
+
+    /// <summary>Index in the hand of the first card matching the predicate, or -1 (Host or owner only).</summary>
+    public int FindCardIndex(Func<CardData, bool> predicate)
+    {
+        for (int i = 0; i < Hand.Count; i++)
+        {
+            CardData card = CardDatabase.Instance.GetById(Hand[i]);
+
+            if (card != null && predicate(card))
+                return i;
+        }
+
+        return -1;
     }
 
     /// <summary>Host only. Removes the card at index; returns its id or -1.</summary>
