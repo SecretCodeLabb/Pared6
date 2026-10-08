@@ -22,3 +22,4 @@ MonoBehaviour:
   abilityDescription: "Avanza m\xE1s casillas... pero puede caer."
   boardColor: {r: 0.95, g: 0.85, b: 0.3, a: 1}
   roomPrefab: {fileID: 5163112373989827298, guid: aa3db0bf0f650894c88ae1bf2b9d8059, type: 3}
+  mission: {fileID: 11400000, guid: 0aacd4c4eab86ca459cf6a28b572f9c1, type: 2}

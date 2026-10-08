@@ -266,6 +266,9 @@ public class TurnManager : NetworkBehaviour
         if (RouletteManager.Instance != null)
             RouletteManager.Instance.ServerAbort();
 
+        if (MissionManager.Instance != null)
+            MissionManager.Instance.ServerAbort();
+
         TurnDeadline.Value = 0;
         MovesRemaining.Value = 0;
         State.Value = TurnState.GameOver;
@@ -288,6 +291,9 @@ public class TurnManager : NetworkBehaviour
 
         if (RouletteManager.Instance != null)
             RouletteManager.Instance.ServerAbort();
+
+        if (MissionManager.Instance != null)
+            MissionManager.Instance.ServerAbort();
 
         ServerEndTurn();
     }
@@ -403,13 +409,22 @@ public class TurnManager : NetworkBehaviour
 
         // Walking onto another player or (optionally) an active event stops the movement there.
         bool eventAhead = Rules.eventsTriggerWhenPassing && IsLiveEventFor(player, next);
-        bool encounter = FindOpponentAt(player, player.GridPosition.Value) != null || eventAhead;
+        bool encounter = FindOpponentAt(player, player.GridPosition.Value) != null || eventAhead ||
+                         IsPendingMissionCell(player, player.GridPosition.Value);
 
         if (encounter && MovesRemaining.Value > 0)
             Debug.Log($"{NetworkConnectionManager.GetInstanceTag()} {player.Name}: movimiento detenido por un encuentro en {player.GridPosition.Value} ({MovesRemaining.Value} pasos sin usar)");
 
         if (encounter || MovesRemaining.Value <= 0 || !HasAnyStep(next))
             ServerFinishMovement(player);
+    }
+
+    /// <summary>The cell is this player's own mission tile and the mission is not completed yet.</summary>
+    private static bool IsPendingMissionCell(PlayerNetworkData player, Vector2Int cell)
+    {
+        return !player.MissionCompleted.Value &&
+               GameStateManager.Instance.TryGetMissionCell(player, out Vector2Int missionCell) &&
+               missionCell == cell;
     }
 
     private bool HasAnyStep(Tile tile)
@@ -501,6 +516,13 @@ public class TurnManager : NetworkBehaviour
             State.Value = TurnState.Combat;
             RestartDeadline();
             CombatManager.Instance.ServerBeginDuel(player, opponent);
+        }
+        else if (MissionManager.Instance != null && IsPendingMissionCell(player, cell))
+        {
+            // Reached the mission tile of the player's own character room.
+            State.Value = TurnState.Mission;
+            RestartDeadline();
+            MissionManager.Instance.ServerBegin(player);
         }
         else if (CombatManager.Instance != null && IsLiveEventFor(player, tile))
         {
@@ -718,6 +740,11 @@ public class TurnManager : NetworkBehaviour
             case TurnState.Roulette:
                 GameStateManager.Instance.ServerBroadcast("Tiempo agotado: la ruleta gira sola");
                 RouletteManager.Instance.ServerForceSpin();
+                break;
+
+            case TurnState.Mission:
+                GameStateManager.Instance.ServerBroadcast("Tiempo agotado: la misión falla");
+                MissionManager.Instance.ServerForceFail();
                 break;
         }
     }

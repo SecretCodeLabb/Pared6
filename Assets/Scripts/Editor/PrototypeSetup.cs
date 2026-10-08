@@ -44,6 +44,7 @@ public static class PrototypeSetup
         CardDesignSetup.ApplyAll();
         RouletteSetup.EnsureAll();
         RoomThemeSetup.CreateAll();
+        MissionSetup.CreateAll();
 
         SetupMenuScene(session);
         SetupGameScene(player);
@@ -392,6 +393,7 @@ public static class PrototypeSetup
         GetOrAdd<CombatManager>(network);
         GetOrAdd<CardManager>(network);
         GetOrAdd<RouletteManager>(network);
+        GetOrAdd<MissionManager>(network);
 
         // Game camera: follows the active player, C toggles the overview, wheel zooms.
         Camera mainCamera = Camera.main != null ? Camera.main : Object.FindFirstObjectByType<Camera>();

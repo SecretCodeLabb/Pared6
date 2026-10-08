@@ -1126,6 +1126,7 @@ GameObject:
   - component: {fileID: 1564498934}
   - component: {fileID: 1564498933}
   - component: {fileID: 1564498937}
+  - component: {fileID: 1564498938}
   m_Layer: 0
   m_Name: GameNetwork
   m_TagString: Untagged
@@ -1547,6 +1548,35 @@ MonoBehaviour:
       MinSecondsBetweenUpdates: 0
       MaxSecondsBetweenUpdates: 0
     m_InternalValue: 0
+--- !u!114 &1564498938
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1564498930}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 62e03e1d4238aed449d8c4e1db0cf5a0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MissionManager
+  ShowTopMostFoldoutHeaderGroup: 1
+  Phase:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: 0
+  PlayerId:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: -1
+  CharacterId:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: -1
+  resultSeconds: 2.5
 --- !u!1 &1601853952
 GameObject:
   m_ObjectHideFlags: 0

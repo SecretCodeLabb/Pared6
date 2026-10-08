@@ -34,6 +34,11 @@ public class GameHUD : MonoBehaviour
     private TextMeshProUGUI hintText;
     private TextMeshProUGUI livesText;
     private TextMeshProUGUI playersText;
+    private TextMeshProUGUI objectiveText;
+
+    private MissionMinigame missionMinigame;
+    private int missionShownFor = -1;
+    private MissionPhase missionResultShown = MissionPhase.None;
     private TextMeshProUGUI toastText;
     private TextMeshProUGUI networkText;
     private Button rollTextButton;
@@ -168,7 +173,11 @@ public class GameHUD : MonoBehaviour
         title.color = UIFactory.AccentColor;
 
         playersText = UIFactory.CreateText(panel.transform, "PlayersText", "", 21f, TextAlignmentOptions.TopLeft);
-        UIFactory.Place(playersText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -48f), new Vector2(372f, 364f));
+        UIFactory.Place(playersText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -48f), new Vector2(372f, 300f));
+
+        objectiveText = UIFactory.CreateText(panel.transform, "Objective", "", 18f, TextAlignmentOptions.BottomLeft);
+        UIFactory.Place(objectiveText.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, 10f), new Vector2(372f, 64f));
+        objectiveText.color = UIFactory.AccentColor;
         playersText.richText = true;
     }
 
@@ -309,6 +318,7 @@ public class GameHUD : MonoBehaviour
         RefreshHand(local);
         RefreshCombat(local);
         RefreshRoulette();
+        RefreshMission(game, local);
         RefreshEnd(turns, game, local);
         RefreshToasts();
 
@@ -356,6 +366,7 @@ public class GameHUD : MonoBehaviour
             case TurnState.TurnEnd: hint = "Fin del turno"; break;
             case TurnState.GameOver: hint = "Partida terminada"; break;
             case TurnState.Roulette: hint = "¡Ruleta!"; break;
+            case TurnState.Mission: hint = "¡Misión en curso!"; break;
             default: hint = ""; break;
         }
 
@@ -405,7 +416,8 @@ public class GameHUD : MonoBehaviour
                     break;
             }
 
-            sb.Append($"   Eventos {p.Progress.Value}/{Rules.requiredEventsToWin}   Cartas {p.HandCount.Value}\n");
+            string mission = p.MissionCompleted.Value ? "<color=#60FF60>Misión hecha</color>" : "Misión pendiente";
+            sb.Append($"   {mission}   Cartas {p.HandCount.Value}\n");
 
             string status = p.IsAlive ? p.StatusSummary() : "";
             sb.Append(string.IsNullOrEmpty(status) ? "\n" : $"     <size=85%><color=#D080FF>{status}</color></size>\n\n");
@@ -733,13 +745,16 @@ public class GameHUD : MonoBehaviour
         if (winner != null)
         {
             sb.Append($"Ganador: <b>{winner.Name}</b> ({CharacterName(winner)})");
+            sb.Append(winner.MissionCompleted.Value
+                ? "\n<size=80%>¡completó su misión!</size>"
+                : "\n<size=80%>último jugador en pie</size>");
 
             if (local != null && local.PlayerId.Value == winnerId)
                 sb.Append("\n\n<color=#FFD040>¡HAS COMPLETADO LA PARTIDA!</color>");
         }
         else
         {
-            sb.Append("Sin ganador");
+            sb.Append("Sin ganador\n<size=80%>todos los jugadores perdieron sus vidas</size>");
         }
 
         bool isHost = NetworkManager.Singleton != null && NetworkManager.Singleton.IsHost;
@@ -807,6 +822,84 @@ public class GameHUD : MonoBehaviour
     {
         if (RouletteManager.Instance != null)
             RouletteManager.Instance.RequestSpinFromLocal();
+    }
+
+    // =========================================================
+    // MISSIONS
+    // =========================================================
+
+    private void RefreshMission(GameStateManager game, PlayerNetworkData local)
+    {
+        // Objective of the local player.
+        if (objectiveText != null)
+        {
+            string objective = "";
+
+            if (local != null && local.MissionCompleted.Value)
+                objective = "OBJETIVO: ¡misión completada!";
+            else if (local != null && local.Character != null && game.TryGetMissionCell(local, out _))
+                objective = $"OBJETIVO: llega a la casilla MISIÓN del Cuarto de {local.Character.characterName} y complétala";
+
+            objectiveText.text = objective;
+        }
+
+        MissionManager manager = MissionManager.Instance;
+        Transform canvas = turnText != null ? turnText.canvas.transform : null;
+
+        if (manager == null || !manager.IsVisible || canvas == null)
+        {
+            CloseMinigame();
+            return;
+        }
+
+        // Open the character's minigame once per mission (placeholder if none assigned).
+        if (missionMinigame == null || missionShownFor != manager.PlayerId.Value)
+        {
+            CloseMinigame();
+
+            MissionDefinition definition = manager.CurrentDefinition;
+            PlayerNetworkData player = PlayerNetworkData.GetByPlayerId(manager.PlayerId.Value);
+            GameObject instance;
+
+            if (definition != null && definition.minigamePrefab != null && definition.minigamePrefab.GetComponent<MissionMinigame>() != null)
+            {
+                instance = Instantiate(definition.minigamePrefab, canvas, false);
+            }
+            else
+            {
+                instance = new GameObject("PlaceholderMission", typeof(RectTransform));
+                instance.transform.SetParent(canvas, false);
+                instance.AddComponent<PlaceholderMissionMinigame>();
+            }
+
+            missionMinigame = instance.GetComponent<MissionMinigame>();
+            missionShownFor = manager.PlayerId.Value;
+            missionResultShown = MissionPhase.None;
+            missionMinigame.Finished += success => MissionManager.Instance?.RequestFinishFromLocal(success);
+            missionMinigame.Begin(definition, player != null ? player.Name : "?", player != null ? CharacterName(player) : "?", manager.IsLocalMission);
+
+            // Keep the end screen above the minigame.
+            if (endPanel != null)
+                endPanel.transform.SetAsLastSibling();
+        }
+
+        MissionPhase phase = manager.Phase.Value;
+
+        if ((phase == MissionPhase.Completed || phase == MissionPhase.Failed) && missionResultShown != phase)
+        {
+            missionResultShown = phase;
+            missionMinigame.ShowResult(phase == MissionPhase.Completed);
+        }
+    }
+
+    private void CloseMinigame()
+    {
+        if (missionMinigame != null)
+            Destroy(missionMinigame.gameObject);
+
+        missionMinigame = null;
+        missionShownFor = -1;
+        missionResultShown = MissionPhase.None;
     }
 
     // =========================================================

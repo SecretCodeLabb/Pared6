@@ -84,6 +84,10 @@ public class GameStateManager : NetworkBehaviour
             foreach (Tile tile in boardManager.GetStartingTiles(GameRules.Instance.maxPlayers))
                 excluded.Add(BoardManager.CellOf(tile));
 
+            // Mission tiles never hold events.
+            foreach (Vector2Int cell in MissionCells())
+                excluded.Add(cell);
+
             foreach (Vector2Int cell in eventManager.PickEventCells(boardManager.GetAllTiles(), eventRng, excluded))
                 EventCells.Add(cell);
 
@@ -155,11 +159,79 @@ public class GameStateManager : NetworkBehaviour
         }
     }
 
+    // =========================================================
+    // MISSIONS
+    // =========================================================
+
+    /// <summary>Mission tile of each themed room (one per character in RoomCharacterIds).</summary>
+    private System.Collections.Generic.IEnumerable<Vector2Int> MissionCells()
+    {
+        BoardLayout layout = mapGenerator.Layout;
+
+        if (layout == null)
+            yield break;
+
+        for (int i = 0; i < RoomCharacterIds.Count && i < RoomThemeAssignment.SideOrder.Length; i++)
+        {
+            BoardRegion side = RoomThemeAssignment.SideOrder[i];
+
+            if (layout.CellsIn(side).Count > 0)
+                yield return layout.MissionCell(side);
+        }
+    }
+
+    /// <summary>The mission tile of this player's character (in that character's room).</summary>
+    public bool TryGetMissionCell(PlayerNetworkData player, out Vector2Int cell)
+    {
+        cell = default;
+        BoardLayout layout = mapGenerator.Layout;
+
+        if (player == null || layout == null)
+            return false;
+
+        for (int i = 0; i < RoomCharacterIds.Count && i < RoomThemeAssignment.SideOrder.Length; i++)
+        {
+            if (RoomCharacterIds[i] != player.CharacterId.Value)
+                continue;
+
+            BoardRegion side = RoomThemeAssignment.SideOrder[i];
+
+            if (layout.CellsIn(side).Count == 0)
+                return false;
+
+            cell = layout.MissionCell(side);
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>All instances: marks every room's mission tile with its character's colour.</summary>
+    private void CreateMissionMarkers()
+    {
+        BoardLayout layout = mapGenerator.Layout;
+
+        if (layout == null)
+            return;
+
+        for (int i = 0; i < RoomCharacterIds.Count && i < RoomThemeAssignment.SideOrder.Length; i++)
+        {
+            CharacterData character = CharacterCatalog.Instance.Get(RoomCharacterIds[i]);
+            Tile tile = boardManager.GetTile(layout.MissionCell(RoomThemeAssignment.SideOrder[i]));
+
+            if (character == null || tile == null)
+                continue;
+
+            MissionTileMarker.Create(tile, character);
+        }
+    }
+
     private void BuildBoard(int seed)
     {
         ApplyRoomThemes();
         mapGenerator.GenerateWithSeed(seed, false);
         boardManager.InitializeBoard();
+        CreateMissionMarkers();
     }
 
     private void ApplyEvents()
@@ -325,9 +397,8 @@ public class GameStateManager : NetworkBehaviour
 
         int winner = VictoryRules.ResolveWinner(
             TurnManager.Instance.CurrentPlayerId.Value,
-            PlayerNetworkData.GetProgressById(rules.maxPlayers),
+            PlayerNetworkData.GetMissionsById(rules.maxPlayers),
             states,
-            rules.requiredEventsToWin,
             StartingPlayerCount.Value);
 
         if (winner != TurnRotation.NoPlayer)

@@ -68,6 +68,8 @@
 
 - **T23 (2026-10-07) Nombre sobre el peón:** `PawnLabel` muestra el nombre del personaje elegido ("(tú)" en el propio); también en el peón offline (primer personaje de la selección local).
 
+- **T24 (2026-10-07) Misiones por personaje:** casilla de misión al fondo de cada habitación (`BoardLayout.MissionCell`), sin eventos; `MissionDefinition` por personaje (`CharacterData.mission`); `MissionManager` (Host, `TurnState.Mission`); base `MissionMinigame` + `PlaceholderMissionMinigame`; marcadores `MissionTileMarker`. Victoria: primero en completar su misión o último en pie (`VictoryRules`); `requiredEventsToWin` eliminado. Probado en Play: llegar a la casilla, fallar y reintentar, completar → victoria, casilla de otro personaje no activa nada. 56 tests.
+
 ## Problemas abiertos
 - Cliente cerrado a la fuerza: ~30 s hasta marcarse DESCONECTADO (timeout de Unity Transport; ajustable en `UnityTransport.DisconnectTimeoutMS`).
 - Timeout de turno implementado pero no probado (desactivado por defecto).

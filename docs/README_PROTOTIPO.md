@@ -40,7 +40,8 @@ En builds de desarrollo existe un bot de pruebas:
      próximo turno; **pierdes una vida** (probabilidad baja); **pelea obligatoria** contra una entidad
      (combate normal, cuenta como evento superado si ganas); **nada**. Los efectos activos se ven en
      la lista de jugadores.
-4. **Fin**: gana el primero en llegar a `requiredEventsToWin` o el último jugador vivo.
+4. **Fin** (un único ganador): el **primero que completa la misión de su personaje** o el **último
+   jugador en pie**. Si todos pierden sus vidas, la partida termina sin ganador.
    Host: **REINICIAR** (vuelve a la selección conservando personajes). Todos: **VOLVER AL MENÚ**.
 
 ## Valores configurables
@@ -59,7 +60,6 @@ Todos en **`Assets/Resources/GameRules.asset`** (Inspector):
 | `consumeOnSuccess` | true | el evento desaparece al superarlo |
 | `maxCardsPerCombat` | 1 | cartas por combate |
 | `startingHandSize` / `allowDuplicateCards` | 3 / true | reparto inicial |
-| `requiredEventsToWin` | 3 | eventos para ganar |
 
 Eventos (escena `Mapa`, objeto `EventManager`): `eventTileCount` (tablero central, 12),
 `eventsPerRoom` (cada habitación, 4), `eventIndicatorScale` (tamaño del marcador, 3).
@@ -125,6 +125,29 @@ En modo offline sin selección se usa `Room_01` en los 4 lados.
 Ajustes en el Inspector: `followDistance`, `minDistance`, `maxDistanceFactor`, `followOffset`
 (desplaza el punto seguido para que la mano de cartas no tape el peón), `overviewMargin`, `smoothTime`.
 Sin el componente, `MapGenerator.autoFrameCamera` encuadra el tablero como antes.
+
+## Misiones por personaje (objetivo del juego)
+
+- Cada habitación lateral es la de un personaje y tiene una **casilla de misión** al fondo, opuesta a
+  la entrada (marcador con el color del personaje y el texto "MISIÓN"). Nunca tiene eventos encima.
+- Tu misión está en la habitación de **tu** personaje (objetivo visible abajo en la lista de jugadores).
+  Entrar en esa casilla detiene el movimiento y abre la misión (si hay otro jugador ahí, primero el duelo).
+  Las casillas de misión de otros personajes no te afectan.
+- **Completar** la misión gana la partida. **Fallar** termina el turno; puedes reintentar entrando otra vez.
+- Ganar eventos ya no da la victoria (siguen dando su resultado normal).
+
+**Datos** (`Assets/ScriptableObjects/Missions/Mission_<Personaje>.asset`, asignado en `CharacterData.mission`):
+`title`, `description`, `icon`, `minigamePrefab` y `tileMarkerPrefab` (marcador 3D propio, opcional).
+
+**Cómo añadir el minijuego de un personaje** (sin tocar red ni turnos):
+1. Crea un prefab de UI (RectTransform) con un componente que herede de `MissionMinigame`.
+2. Monta el juego en `OnBegin()`; llama `Finish(true)` si lo completa o `Finish(false)` si falla.
+   `IsLocalPlayer` indica si es el jugador que juega la misión (los demás ven el mismo prefab como espectadores).
+   `ShowResult(bool)` se llama en todos cuando el Host decide.
+3. Asígnalo en `minigamePrefab` de su `MissionDefinition`. Mientras esté vacío se usa
+   `PlaceholderMissionMinigame` (botones COMPLETAR / FALLAR para probar).
+
+PPOP/Create Missions crea una misión provisional por personaje solo donde falte (no pisa tus cambios).
 
 ## Cómo añadir una carta
 

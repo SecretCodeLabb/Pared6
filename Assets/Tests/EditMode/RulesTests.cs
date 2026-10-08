@@ -69,38 +69,87 @@ public class VictoryRulesTests
     private const PlayerLifeState E = PlayerLifeState.Eliminated;
 
     [Test]
-    public void ReachingGoalWins()
+    public void CompletingTheMissionWins()
     {
-        int winner = VictoryRules.ResolveWinner(1, new List<int> { 0, 3 }, new List<PlayerLifeState> { A, A }, 3, 2);
+        int winner = VictoryRules.ResolveWinner(1, new List<bool> { false, true }, new List<PlayerLifeState> { A, A }, 2);
         Assert.AreEqual(1, winner);
     }
 
     [Test]
-    public void NoWinnerBelowGoal()
+    public void NoWinnerWithoutMissionAndSeveralAlive()
     {
-        int winner = VictoryRules.ResolveWinner(0, new List<int> { 2, 2 }, new List<PlayerLifeState> { A, A }, 3, 2);
+        int winner = VictoryRules.ResolveWinner(0, new List<bool> { false, false }, new List<PlayerLifeState> { A, A }, 2);
         Assert.AreEqual(TurnRotation.NoPlayer, winner);
     }
 
     [Test]
     public void TieGoesToActivePlayer()
     {
-        int winner = VictoryRules.ResolveWinner(1, new List<int> { 3, 3 }, new List<PlayerLifeState> { A, A }, 3, 2);
+        int winner = VictoryRules.ResolveWinner(1, new List<bool> { true, true }, new List<PlayerLifeState> { A, A }, 2);
         Assert.AreEqual(1, winner);
+    }
+
+    [Test]
+    public void EliminatedPlayerCannotWinByMission()
+    {
+        int winner = VictoryRules.ResolveWinner(0, new List<bool> { true, false, false }, new List<PlayerLifeState> { E, A, A }, 3);
+        Assert.AreEqual(TurnRotation.NoPlayer, winner);
     }
 
     [Test]
     public void LastPlayerStandingWins()
     {
-        int winner = VictoryRules.ResolveWinner(0, new List<int> { 0, 0, 0 }, new List<PlayerLifeState> { E, A, E }, 3, 3);
+        int winner = VictoryRules.ResolveWinner(0, new List<bool> { false, false, false }, new List<PlayerLifeState> { E, A, E }, 3);
         Assert.AreEqual(1, winner);
+    }
+
+    [Test]
+    public void EveryoneEliminatedHasNoWinner()
+    {
+        int winner = VictoryRules.ResolveWinner(0, new List<bool> { false, false }, new List<PlayerLifeState> { E, E }, 2);
+        Assert.AreEqual(TurnRotation.NoPlayer, winner);
+        Assert.AreEqual(0, TurnRotation.CountAlive(new List<PlayerLifeState> { E, E }));
     }
 
     [Test]
     public void SoloGameDoesNotWinByLastStanding()
     {
-        int winner = VictoryRules.ResolveWinner(0, new List<int> { 0 }, new List<PlayerLifeState> { A }, 3, 1);
+        int winner = VictoryRules.ResolveWinner(0, new List<bool> { false }, new List<PlayerLifeState> { A }, 1);
         Assert.AreEqual(TurnRotation.NoPlayer, winner);
+    }
+}
+
+public class MissionCellTests
+{
+    private static BoardLayout.Settings Settings(int center, int room) => new BoardLayout.Settings
+    {
+        centerWidth = center, centerHeight = center, centerExtraPathChance = 0.35f,
+        roomWidth = room, roomDepth = room, roomExtraPathChance = 0.35f,
+        north = true, south = true, east = true, west = true
+    };
+
+    [TestCase(11, 7)]
+    [TestCase(8, 5)]
+    public void MissionCellIsAtTheBackOfItsRoomAndReachable(int center, int room)
+    {
+        for (int seed = 0; seed < 50; seed++)
+        {
+            BoardLayout layout = BoardLayout.Generate(Settings(center, room), seed);
+            var reachable = layout.Reachable(new Vector2Int(center / 2, center / 2));
+
+            foreach (BoardRegion side in RoomThemeAssignment.SideOrder)
+            {
+                Vector2Int cell = layout.MissionCell(side);
+                Assert.IsTrue(layout.Contains(cell), $"{side} seed {seed}");
+                Assert.AreEqual(side, layout.RegionOf(cell));
+                Assert.IsTrue(reachable.Contains(cell));
+
+                // Opposite the entrance: as far as possible from it inside the room.
+                Vector2Int entrance = layout.Entrances[side];
+                int distance = Mathf.Abs(cell.x - entrance.x) + Mathf.Abs(cell.y - entrance.y);
+                Assert.AreEqual(room - 1, distance, side.ToString());
+            }
+        }
     }
 }
 

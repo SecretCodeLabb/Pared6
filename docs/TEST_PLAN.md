@@ -30,7 +30,7 @@ Ejecutar: Window > General > Test Runner > EditMode > Run All, o
 | 6 | J2 termina en EventTile → combate, usa carta, tira y compara con `requiredCombatRoll` | ✅ (cliente usó carta, `5 + 3 = 8 vs 4`) |
 | 7 | Gana → +1 progreso; pierde → −1 vida visible en ambos | ✅ evento consumido en todas las instancias; derrota resta vida y a 0 → ELIMINADO |
 | 8 | El turno pasa y se sigue jugando | ✅ 11+ turnos alternos sin desincronización |
-| 9 | Al alcanzar `requiredEventsToWin` aparece la pantalla final en ambos | ✅ `PARTIDA TERMINADA`, mismo ganador, `¡HAS COMPLETADO LA PARTIDA!` para él |
+| 9 | (Antes: al alcanzar `requiredEventsToWin`.) Desde T24 se gana completando la misión del personaje; la pantalla final aparece en ambos | ✅ `PARTIDA TERMINADA`, mismo ganador, `¡HAS COMPLETADO LA PARTIDA!` para él |
 | 10 | Volver al menú sin errores; reiniciar y jugar otra partida | ✅ REINICIAR → selección (LISTO reseteado) → 2ª partida; VOLVER AL MENÚ → Host puede volver a crear |
 
 ## Casos límite
@@ -54,5 +54,5 @@ Ejecutar: Window > General > Test Runner > EditMode > Run All, o
 2. Original: CREAR. Clon: escribe la IP (o 127.0.0.1) y UNIRSE.
 3. Elige personajes, intenta coger el del otro (debe salir el aviso), LISTO en ambos, START.
 4. Juega con WASD/flechas o los botones; prueba usar una carta en un combate.
-5. Baja `requiredEventsToWin` a 1 en `Assets/Resources/GameRules.asset` para llegar rápido al final; REINICIAR dos veces.
+5. Lleva a tu personaje a la casilla MISIÓN de su habitación y pulsa COMPLETAR MISIÓN para llegar al final; REINICIAR dos veces.
 6. Cierra el clon en mitad de partida y comprueba que el Host no se bloquea.

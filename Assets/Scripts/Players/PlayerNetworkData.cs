@@ -42,6 +42,9 @@ public class PlayerNetworkData : NetworkBehaviour
     public NetworkVariable<int> EventShieldTurns = new NetworkVariable<int>(0);
     public NetworkVariable<float> EventShieldChance = new NetworkVariable<float>(0f);
 
+    /// <summary>The player completed their character's mission (wins the game).</summary>
+    public NetworkVariable<bool> MissionCompleted = new NetworkVariable<bool>(false);
+
     /// <summary>Card ids. Only the owner (and the Host) receive it; others see HandCount.</summary>
     public NetworkList<int> Hand;
 
@@ -121,6 +124,19 @@ public class PlayerNetworkData : NetworkBehaviour
         return states;
     }
 
+    public static List<bool> GetMissionsById(int maxPlayers)
+    {
+        List<bool> missions = new List<bool>();
+
+        for (int i = 0; i < maxPlayers; i++)
+        {
+            PlayerNetworkData p = GetByPlayerId(i);
+            missions.Add(p != null && p.MissionCompleted.Value);
+        }
+
+        return missions;
+    }
+
     public static List<int> GetProgressById(int maxPlayers)
     {
         List<int> progress = new List<int>();
@@ -159,6 +175,7 @@ public class PlayerNetworkData : NetworkBehaviour
         CardsBlockedTurns.OnValueChanged += OnIntChanged;
         DamagePenaltyTurns.OnValueChanged += OnIntChanged;
         EventShieldTurns.OnValueChanged += OnIntChanged;
+        MissionCompleted.OnValueChanged += OnBoolChanged;
         State.OnValueChanged += OnStateChanged;
         GridPosition.OnValueChanged += OnGridPositionChanged;
         Hand.OnListChanged += OnHandChanged;
@@ -187,6 +204,7 @@ public class PlayerNetworkData : NetworkBehaviour
         CardsBlockedTurns.OnValueChanged -= OnIntChanged;
         DamagePenaltyTurns.OnValueChanged -= OnIntChanged;
         EventShieldTurns.OnValueChanged -= OnIntChanged;
+        MissionCompleted.OnValueChanged -= OnBoolChanged;
         State.OnValueChanged -= OnStateChanged;
         GridPosition.OnValueChanged -= OnGridPositionChanged;
         Hand.OnListChanged -= OnHandChanged;
@@ -409,6 +427,11 @@ public class PlayerNetworkData : NetworkBehaviour
     // =========================================================
 
     private void OnIntChanged(int previous, int current)
+    {
+        AnyChanged?.Invoke();
+    }
+
+    private void OnBoolChanged(bool previous, bool current)
     {
         AnyChanged?.Invoke();
     }

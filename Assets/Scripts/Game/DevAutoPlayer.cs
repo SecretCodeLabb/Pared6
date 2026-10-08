@@ -188,6 +188,15 @@ public class DevAutoPlayer : MonoBehaviour
             return;
         }
 
+        // Bot completes its mission placeholder (dev testing only).
+        MissionManager mission = MissionManager.Instance;
+
+        if (mission != null && mission.IsSpawned && mission.Phase.Value == MissionPhase.Active && mission.IsLocalMission)
+        {
+            mission.RequestFinishFromLocal(true);
+            return;
+        }
+
         RouletteManager roulette = RouletteManager.Instance;
 
         if (roulette != null && roulette.CanLocalSpin())

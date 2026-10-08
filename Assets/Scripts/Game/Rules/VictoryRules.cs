@@ -1,25 +1,26 @@
 using System.Collections.Generic;
 
 /// <summary>
-/// Pure victory logic. Tie rule: if several players reach the goal at once,
-/// the active player wins; otherwise the lowest PlayerId wins.
+/// Pure victory logic. A single winner: the first player who completes their character's
+/// mission, or the last player standing. Tie rule (cannot normally happen, only the active
+/// player plays a mission): the active player wins, otherwise the lowest PlayerId.
+/// If nobody is alive the game ends without a winner (handled by the caller).
 /// </summary>
 public static class VictoryRules
 {
     /// <returns>Winner PlayerId or TurnRotation.NoPlayer if the game continues.</returns>
     public static int ResolveWinner(
         int activePlayerId,
-        IReadOnlyList<int> progressById,
+        IReadOnlyList<bool> missionCompletedById,
         IReadOnlyList<PlayerLifeState> statesById,
-        int requiredEventsToWin,
         int startingPlayerCount)
     {
-        if (IsEligible(activePlayerId, progressById, statesById, requiredEventsToWin))
+        if (IsEligible(activePlayerId, missionCompletedById, statesById))
             return activePlayerId;
 
-        for (int i = 0; i < progressById.Count; i++)
+        for (int i = 0; i < missionCompletedById.Count; i++)
         {
-            if (IsEligible(i, progressById, statesById, requiredEventsToWin))
+            if (IsEligible(i, missionCompletedById, statesById))
                 return i;
         }
 
@@ -34,14 +35,12 @@ public static class VictoryRules
 
     private static bool IsEligible(
         int playerId,
-        IReadOnlyList<int> progressById,
-        IReadOnlyList<PlayerLifeState> statesById,
-        int requiredEventsToWin)
+        IReadOnlyList<bool> missionCompletedById,
+        IReadOnlyList<PlayerLifeState> statesById)
     {
-        if (playerId < 0 || playerId >= progressById.Count || playerId >= statesById.Count)
+        if (playerId < 0 || playerId >= missionCompletedById.Count || playerId >= statesById.Count)
             return false;
 
-        return statesById[playerId] == PlayerLifeState.Alive &&
-               progressById[playerId] >= requiredEventsToWin;
+        return statesById[playerId] == PlayerLifeState.Alive && missionCompletedById[playerId];
     }
 }

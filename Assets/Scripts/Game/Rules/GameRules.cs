@@ -50,8 +50,8 @@ public class GameRules : ScriptableObject
     [Min(0)] public int startingHandSize = 3;
     public bool allowDuplicateCards = true;
 
-    [Header("Victory")]
-    [Min(1)] public int requiredEventsToWin = 3;
+    // Victory: first player to complete their character's mission, or the last one standing
+    // (see VictoryRules). Events no longer decide the winner.
 
     private static GameRules cached;
 

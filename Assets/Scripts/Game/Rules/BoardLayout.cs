@@ -113,6 +113,25 @@ public class BoardLayout
         }
     }
 
+    /// <summary>
+    /// Mission tile of a side room: the back-centre cell, opposite the entrance, so the player
+    /// has to cross the room's maze to reach it.
+    /// </summary>
+    public Vector2Int MissionCell(BoardRegion side)
+    {
+        Settings s = Config;
+        Vector2Int exit = CenterExit(side);
+
+        switch (side)
+        {
+            case BoardRegion.North: return new Vector2Int(exit.x, s.centerHeight + s.roomDepth - 1);
+            case BoardRegion.South: return new Vector2Int(exit.x, -s.roomDepth);
+            case BoardRegion.East: return new Vector2Int(s.centerWidth + s.roomDepth - 1, exit.y);
+            case BoardRegion.West: return new Vector2Int(-s.roomDepth, exit.y);
+            default: return exit;
+        }
+    }
+
     // =========================================================
     // GENERATION
     // =========================================================

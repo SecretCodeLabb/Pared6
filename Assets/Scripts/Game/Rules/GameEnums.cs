@@ -15,7 +15,8 @@ public enum TurnState : byte
     Combat,
     TurnEnd,
     GameOver,
-    Roulette
+    Roulette,
+    Mission
 }
 
 public enum RoulettePhase : byte

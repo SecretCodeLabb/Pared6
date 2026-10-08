@@ -17,4 +17,7 @@ public class CharacterData : ScriptableObject
 
     [Tooltip("Side room style for this character (room prefab with RoomBuilder: tile prefab + decorations). Used when the character is in the match.")]
     public GameObject roomPrefab;
+
+    [Tooltip("Mission played on the mission tile of this character's room. Completing it wins the game.")]
+    public MissionDefinition mission;
 }
