@@ -126,6 +126,28 @@ Ajustes en el Inspector: `followDistance`, `minDistance`, `maxDistanceFactor`, `
 (desplaza el punto seguido para que la mano de cartas no tape el peón), `overviewMargin`, `smoothTime`.
 Sin el componente, `MapGenerator.autoFrameCamera` encuadra el tablero como antes.
 
+## Android (APK) y UI responsive
+
+**Requisito:** en Unity Hub, módulo *Android Build Support* con *Android SDK & NDK Tools* y *OpenJDK*
+para 6000.3.7f1 (necesita ~13 GB libres en el disco del Editor).
+
+- `PPOP/Android/Apply Android Settings`: nombre "Pared", paquete `com.ppop.pared`, IL2CPP ARM64,
+  solo horizontal, permiso de Internet, APK (no .aab). Lo aplican también los menús de build.
+- `PPOP/Android/Build APK` → `Builds/Android/Pared.apk` (`Build APK (Development)` incluye el bot de pruebas).
+- Instalar: copiar el APK al móvil y abrirlo (permitir "orígenes desconocidos"). Todos los móviles en la
+  misma Wi-Fi; el Host ve su IP en el menú.
+- En Android la app se pausa al pasar a segundo plano: si el Host minimiza el juego, los demás se desconectan.
+
+**UI en cualquier pantalla** (sin tocar las escenas):
+- `ResponsiveCanvas` se añade solo a todos los Canvas: CanvasScaler en modo *Expand* (nada se corta en
+  20:9, 16:9 ni 4:3) y contenido dentro de la *safe area* (notch). Los fondos a pantalla completa quedan fuera.
+- El HUD de partida está diseñado para caber en 1280×720 lógicos; en móviles la UI se agranda
+  (`PhoneFactor` según el tamaño físico de la pantalla) y en tablets/monitores sobra espacio alrededor.
+- `ScaleToFit` reduce bloques grandes que no caben (ruleta, minijuegos de misión, pantalla final).
+  Si rediseñas la ruleta o un minijuego, se adaptan solos.
+- Táctil: pellizco = zoom de cámara, botón VER TABLERO / SEGUIR TURNO (= tecla C), flechas grandes.
+- Probar en el Editor: Game view a 2400×1080 y, en Play, `ResponsiveCanvas.ForcePhone = true`.
+
 ## Misiones por personaje (objetivo del juego)
 
 - Cada habitación lateral es la de un personaje y tiene una **casilla de misión** al fondo, opuesta a

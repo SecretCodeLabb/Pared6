@@ -17,6 +17,11 @@ public class GameHUD : MonoBehaviour
     private const float ToastSeconds = 4f;
     private const string Heart = "♥";
 
+    // Tablets / monitors use DesignResolution; phones scale the UI up to PhoneHeight
+    // (the layout below is built to fit 1280x720).
+    private static readonly Vector2 DesignResolution = new Vector2(1600f, 900f);
+    private const float PhoneHeight = 720f;
+
     [Header("Existing scene UI (reused)")]
     [SerializeField] private BoardManager boardManager;
     [SerializeField] private Button rollButton;
@@ -43,6 +48,8 @@ public class GameHUD : MonoBehaviour
     private TextMeshProUGUI networkText;
     private Button rollTextButton;
     private Button turnCardButton;
+    private Button viewButton;
+    private BoardCameraController boardCamera;
     private readonly List<Button> moveButtons = new List<Button>();
 
     private GameObject handPanel;
@@ -118,117 +125,200 @@ public class GameHUD : MonoBehaviour
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = 10;
 
+        // Layout fits a 1280x720 logical canvas (phones); bigger screens get more room around it.
         CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920f, 1080f);
-        scaler.matchWidthOrHeight = 0.5f;
+        scaler.referenceResolution = DesignResolution;
+        ResponsiveCanvas responsive = ResponsiveCanvas.Ensure(canvas, DesignResolution.y / PhoneHeight);
 
-        Transform root = canvasObject.transform;
+        // HUD widgets live inside the safe area; full-screen overlays use the whole canvas.
+        Transform root = responsive.Content;
+        Transform overlays = canvasObject.transform;
 
         BuildTurnBanner(root);
         BuildPlayersPanel(root);
         BuildActionsPanel(root);
         BuildHandPanel(root);
         BuildCombatPanel(root);
-        BuildRoulette(root);
-        BuildEndPanel(root);
+        BuildTopButtons(root);
+        AdoptSceneDice(root);
 
-        toastText = UIFactory.CreateText(root, "Toasts", "", 26f);
-        UIFactory.Place(toastText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -150f), new Vector2(900f, 130f));
+        toastText = UIFactory.CreateText(root, "Toasts", "", 22f);
+        UIFactory.Place(toastText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -126f), new Vector2(600f, 110f));
         toastText.color = UIFactory.AccentColor;
         toastText.outlineWidth = 0.2f;
         toastText.outlineColor = Color.black;
 
-        networkText = UIFactory.CreateText(root, "NetworkInfo", "", 16f, TextAlignmentOptions.BottomRight);
-        UIFactory.Place(networkText.rectTransform, new Vector2(1f, 0f), new Vector2(-12f, 8f), new Vector2(500f, 30f));
-        networkText.color = new Color(1f, 1f, 1f, 0.6f);
+        networkText = UIFactory.CreateText(root, "NetworkInfo", "", 13f, TextAlignmentOptions.BottomRight);
+        UIFactory.Place(networkText.rectTransform, new Vector2(1f, 0f), new Vector2(-10f, 4f), new Vector2(420f, 22f));
+        networkText.color = new Color(1f, 1f, 1f, 0.55f);
 
-        Button menuButton = UIFactory.CreateButton(root, "MenuButton", "SALIR AL MENÚ", OnMenuClicked, UIFactory.DangerColor, 18f);
-        UIFactory.Place((RectTransform)menuButton.transform, new Vector2(1f, 1f), new Vector2(-12f, -12f), new Vector2(190f, 44f));
+        BuildRoulette(overlays);
+        AdoptEventAnnouncement(overlays);
+        BuildEndPanel(overlays);
+    }
+
+    /// <summary>
+    /// The scene's short announcement panel (EventUI: "¡PELEA OBLIGATORIA!", "EVENTO ACTIVADO")
+    /// moves above the HUD, centred and readable on any screen.
+    /// </summary>
+    private void AdoptEventAnnouncement(Transform overlays)
+    {
+        EventUI eventUI = EventUI.Instance != null ? EventUI.Instance : FindFirstObjectByType<EventUI>();
+
+        if (eventUI == null || eventUI.eventPanel == null)
+            return;
+
+        RectTransform panel = (RectTransform)eventUI.eventPanel.transform;
+        panel.SetParent(overlays, false);
+        panel.localScale = Vector3.one;
+        panel.localRotation = Quaternion.identity;
+        UIFactory.Place(panel, new Vector2(0.5f, 0.5f), new Vector2(0f, 80f), new Vector2(720f, 150f));
+        panel.pivot = new Vector2(0.5f, 0.5f);
+        panel.gameObject.AddComponent<ScaleToFit>();
+
+        // Opaque so it does not mix with the combat panel behind it.
+        Image background = panel.GetComponent<Image>();
+
+        if (background != null)
+            background.color = new Color(0.10f, 0.06f, 0.08f, 0.96f);
+
+        if (eventUI.eventText is TextMeshProUGUI text)
+        {
+            UIFactory.Stretch(text.rectTransform, 12f);
+            text.rectTransform.localScale = Vector3.one;
+            text.alignment = TextAlignmentOptions.Center;
+            text.enableAutoSizing = true;
+            text.fontSizeMin = 18f;
+            text.fontSizeMax = 52f;
+        }
+    }
+
+    private void BuildTopButtons(Transform root)
+    {
+        Button menuButton = UIFactory.CreateButton(root, "MenuButton", "SALIR", OnMenuClicked, UIFactory.DangerColor, 18f);
+        UIFactory.Place((RectTransform)menuButton.transform, new Vector2(0f, 1f), new Vector2(12f, -12f), new Vector2(120f, 56f));
+
+        // Overview / follow toggle (same as the C key) for touch screens.
+        viewButton = UIFactory.CreateButton(root, "ViewButton", "VISTA", OnViewClicked, UIFactory.ButtonColor, 17f);
+        UIFactory.Place((RectTransform)viewButton.transform, new Vector2(0f, 1f), new Vector2(142f, -12f), new Vector2(150f, 56f));
+    }
+
+    /// <summary>
+    /// The Mapa scene's dice button and roll info (still used offline) move into the HUD, under the
+    /// top buttons, so they follow the same responsive layout and safe area.
+    /// </summary>
+    private void AdoptSceneDice(Transform root)
+    {
+        if (rollButton != null)
+        {
+            RectTransform dice = (RectTransform)rollButton.transform;
+            dice.SetParent(root, false);
+            dice.localScale = Vector3.one;
+            UIFactory.Place(dice, new Vector2(0f, 1f), new Vector2(16f, -80f), new Vector2(90f, 90f));
+        }
+
+        if (gameInfoText != null)
+        {
+            RectTransform info = gameInfoText.rectTransform;
+            info.SetParent(root, false);
+            info.localScale = Vector3.one;
+            UIFactory.Place(info, new Vector2(0f, 1f), new Vector2(116f, -88f), new Vector2(200f, 70f));
+            gameInfoText.fontSize = 18f;
+            gameInfoText.alignment = TextAlignmentOptions.TopLeft;
+        }
     }
 
     private void BuildTurnBanner(Transform root)
     {
         Image banner = UIFactory.CreatePanel(root, "TurnBanner", UIFactory.PanelColor);
-        UIFactory.Place(banner.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -10f), new Vector2(760f, 130f));
+        UIFactory.Place(banner.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -8f), new Vector2(560f, 112f));
 
-        turnText = UIFactory.CreateText(banner.transform, "TurnText", "", 36f);
-        UIFactory.Place(turnText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -6f), new Vector2(740f, 48f));
+        turnText = UIFactory.CreateText(banner.transform, "TurnText", "", 28f);
+        UIFactory.Place(turnText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -4f), new Vector2(540f, 40f));
+        AutoSize(turnText, 18f);
 
-        localTurnText = UIFactory.CreateText(banner.transform, "LocalTurnText", "", 30f);
-        UIFactory.Place(localTurnText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -52f), new Vector2(740f, 40f));
+        localTurnText = UIFactory.CreateText(banner.transform, "LocalTurnText", "", 24f);
+        UIFactory.Place(localTurnText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -44f), new Vector2(540f, 34f));
 
-        hintText = UIFactory.CreateText(banner.transform, "HintText", "", 20f);
-        UIFactory.Place(hintText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -94f), new Vector2(740f, 30f));
+        hintText = UIFactory.CreateText(banner.transform, "HintText", "", 17f);
+        UIFactory.Place(hintText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -78f), new Vector2(540f, 30f));
         hintText.color = new Color(0.85f, 0.85f, 0.85f);
+        AutoSize(hintText, 12f);
     }
 
     private void BuildPlayersPanel(Transform root)
     {
         Image panel = UIFactory.CreatePanel(root, "PlayersPanel", UIFactory.PanelColor);
-        UIFactory.Place(panel.rectTransform, new Vector2(1f, 1f), new Vector2(-12f, -66f), new Vector2(400f, 420f));
+        UIFactory.Place(panel.rectTransform, new Vector2(1f, 1f), new Vector2(-12f, -12f), new Vector2(330f, 380f));
 
-        TextMeshProUGUI title = UIFactory.CreateText(panel.transform, "Title", "JUGADORES", 26f);
-        UIFactory.Place(title.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -8f), new Vector2(380f, 34f));
+        TextMeshProUGUI title = UIFactory.CreateText(panel.transform, "Title", "JUGADORES", 22f);
+        UIFactory.Place(title.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -6f), new Vector2(310f, 30f));
         title.color = UIFactory.AccentColor;
 
-        playersText = UIFactory.CreateText(panel.transform, "PlayersText", "", 21f, TextAlignmentOptions.TopLeft);
-        UIFactory.Place(playersText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -48f), new Vector2(372f, 300f));
-
-        objectiveText = UIFactory.CreateText(panel.transform, "Objective", "", 18f, TextAlignmentOptions.BottomLeft);
-        UIFactory.Place(objectiveText.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, 10f), new Vector2(372f, 64f));
-        objectiveText.color = UIFactory.AccentColor;
+        playersText = UIFactory.CreateText(panel.transform, "PlayersText", "", 17f, TextAlignmentOptions.TopLeft);
+        UIFactory.Place(playersText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -40f), new Vector2(310f, 280f));
         playersText.richText = true;
+        AutoSize(playersText, 11f);
+
+        objectiveText = UIFactory.CreateText(panel.transform, "Objective", "", 15f, TextAlignmentOptions.BottomLeft);
+        UIFactory.Place(objectiveText.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, 8f), new Vector2(310f, 54f));
+        objectiveText.color = UIFactory.AccentColor;
+        AutoSize(objectiveText, 11f);
     }
 
     private void BuildActionsPanel(Transform root)
     {
         Image panel = UIFactory.CreatePanel(root, "ActionsPanel", UIFactory.PanelColor);
-        UIFactory.Place(panel.rectTransform, new Vector2(0f, 0f), new Vector2(12f, 12f), new Vector2(330f, 392f));
+        UIFactory.Place(panel.rectTransform, new Vector2(0f, 0f), new Vector2(12f, 12f), new Vector2(300f, 414f));
 
-        livesText = UIFactory.CreateText(panel.transform, "LivesText", "", 30f);
-        UIFactory.Place(livesText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -8f), new Vector2(310f, 44f));
+        livesText = UIFactory.CreateText(panel.transform, "LivesText", "", 26f);
+        UIFactory.Place(livesText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -4f), new Vector2(280f, 36f));
 
-        rollTextButton = UIFactory.CreateButton(panel.transform, "RollDiceButton", "TIRAR DADO", OnRollClicked, UIFactory.ButtonColor, 28f);
-        UIFactory.Place((RectTransform)rollTextButton.transform, new Vector2(0.5f, 1f), new Vector2(0f, -60f), new Vector2(300f, 64f));
+        rollTextButton = UIFactory.CreateButton(panel.transform, "RollDiceButton", "TIRAR DADO", OnRollClicked, UIFactory.ButtonColor, 26f);
+        UIFactory.Place((RectTransform)rollTextButton.transform, new Vector2(0.5f, 1f), new Vector2(0f, -42f), new Vector2(280f, 62f));
 
         // Special cards played on the own turn (Silencio líquido, Cívica, Comida Frita).
-        turnCardButton = UIFactory.CreateButton(panel.transform, "TurnCardButton", "USAR CARTA ESPECIAL", OnTurnCardClicked, new Color(0.45f, 0.18f, 0.70f), 20f);
-        UIFactory.Place((RectTransform)turnCardButton.transform, new Vector2(0.5f, 1f), new Vector2(0f, -132f), new Vector2(300f, 50f));
+        turnCardButton = UIFactory.CreateButton(panel.transform, "TurnCardButton", "USAR CARTA ESPECIAL", OnTurnCardClicked, new Color(0.45f, 0.18f, 0.70f), 18f);
+        UIFactory.Place((RectTransform)turnCardButton.transform, new Vector2(0.5f, 1f), new Vector2(0f, -110f), new Vector2(280f, 50f));
 
-        TextMeshProUGUI moveLabel = UIFactory.CreateText(panel.transform, "MoveLabel", "MOVER (WASD / flechas)", 18f);
-        UIFactory.Place(moveLabel.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -194f), new Vector2(300f, 26f));
+        string moveHint = ResponsiveCanvas.IsTouchDevice ? "MOVER" : "MOVER (WASD / flechas)";
+        TextMeshProUGUI moveLabel = UIFactory.CreateText(panel.transform, "MoveLabel", moveHint, 15f);
+        UIFactory.Place(moveLabel.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -164f), new Vector2(280f, 22f));
 
-        AddMoveButton(panel.transform, "↑", Vector2Int.up, new Vector2(0f, -226f));
-        AddMoveButton(panel.transform, "←", Vector2Int.left, new Vector2(-80f, -286f));
-        AddMoveButton(panel.transform, "→", Vector2Int.right, new Vector2(80f, -286f));
-        AddMoveButton(panel.transform, "↓", Vector2Int.down, new Vector2(0f, -326f));
+        // Big touch-friendly pad.
+        AddMoveButton(panel.transform, "↑", Vector2Int.up, new Vector2(0f, -190f));
+        AddMoveButton(panel.transform, "←", Vector2Int.left, new Vector2(-94f, -264f));
+        AddMoveButton(panel.transform, "→", Vector2Int.right, new Vector2(94f, -264f));
+        AddMoveButton(panel.transform, "↓", Vector2Int.down, new Vector2(0f, -338f));
     }
 
     private void AddMoveButton(Transform parent, string label, Vector2Int direction, Vector2 position)
     {
-        Button button = UIFactory.CreateButton(parent, "Move" + direction, label, () => OnMoveClicked(direction), UIFactory.ButtonColor, 30f);
-        UIFactory.Place((RectTransform)button.transform, new Vector2(0.5f, 1f), position, new Vector2(70f, 56f));
+        Button button = UIFactory.CreateButton(parent, "Move" + direction, label, () => OnMoveClicked(direction), UIFactory.ButtonColor, 34f);
+        UIFactory.Place((RectTransform)button.transform, new Vector2(0.5f, 1f), position, new Vector2(90f, 68f));
         moveButtons.Add(button);
     }
 
-    private const float HandCardWidth = 172f;
+    private const float HandCardWidth = 140f;
     private const float HandCardHeight = HandCardWidth / CardLayout.Aspect;
+    private const float HandPanelHeight = HandCardHeight + 40f;
 
     private void BuildHandPanel(Transform root)
     {
         Image panel = UIFactory.CreatePanel(root, "HandPanel", UIFactory.PanelColor);
-        UIFactory.Place(panel.rectTransform, new Vector2(0.5f, 0f), new Vector2(60f, 12f), new Vector2(760f, HandCardHeight + 52f));
+        UIFactory.Place(panel.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, 12f), new Vector2(500f, HandPanelHeight));
         handPanel = panel.gameObject;
 
-        handTitle = UIFactory.CreateText(panel.transform, "Title", "MIS CARTAS", 22f);
-        UIFactory.Place(handTitle.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -4f), new Vector2(740f, 30f));
+        handTitle = UIFactory.CreateText(panel.transform, "Title", "MIS CARTAS", 18f);
+        UIFactory.Place(handTitle.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -3f), new Vector2(480f, 26f));
         handTitle.color = UIFactory.AccentColor;
+        AutoSize(handTitle, 12f);
 
         RectTransform container = UIFactory.CreateRect(panel.transform, "Cards");
-        UIFactory.Place(container, new Vector2(0.5f, 0f), new Vector2(0f, 10f), new Vector2(740f, HandCardHeight + 4f));
+        UIFactory.Place(container, new Vector2(0.5f, 0f), new Vector2(0f, 8f), new Vector2(480f, HandCardHeight + 4f));
         HorizontalLayoutGroup layout = container.gameObject.AddComponent<HorizontalLayoutGroup>();
-        layout.spacing = 16f;
+        layout.spacing = 12f;
         layout.childAlignment = TextAnchor.MiddleCenter;
         layout.childControlWidth = false;
         layout.childControlHeight = false;
@@ -238,28 +328,32 @@ public class GameHUD : MonoBehaviour
 
     private void BuildCombatPanel(Transform root)
     {
+        // Above the hand so the cards stay visible and selectable during the fight.
         Image panel = UIFactory.CreatePanel(root, "CombatPanel", new Color(0.12f, 0.05f, 0.05f, 0.94f));
-        UIFactory.Place(panel.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 60f), new Vector2(760f, 430f));
+        UIFactory.Place(panel.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, HandPanelHeight + 20f), new Vector2(600f, 326f));
         combatPanel = panel.gameObject;
 
-        combatTitle = UIFactory.CreateText(panel.transform, "Title", "", 30f);
-        UIFactory.Place(combatTitle.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -12f), new Vector2(730f, 44f));
+        combatTitle = UIFactory.CreateText(panel.transform, "Title", "", 24f);
+        UIFactory.Place(combatTitle.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -8f), new Vector2(580f, 36f));
         combatTitle.color = new Color(1f, 0.45f, 0.35f);
+        AutoSize(combatTitle, 16f);
 
-        combatBody = UIFactory.CreateText(panel.transform, "Body", "", 24f);
-        UIFactory.Place(combatBody.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -58f), new Vector2(730f, 170f));
+        combatBody = UIFactory.CreateText(panel.transform, "Body", "", 18f);
+        UIFactory.Place(combatBody.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -46f), new Vector2(580f, 150f));
+        AutoSize(combatBody, 12f);
 
-        combatResult = UIFactory.CreateText(panel.transform, "Result", "", 40f);
-        UIFactory.Place(combatResult.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -214f), new Vector2(730f, 60f));
+        combatResult = UIFactory.CreateText(panel.transform, "Result", "", 30f);
+        UIFactory.Place(combatResult.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -198f), new Vector2(580f, 46f));
+        AutoSize(combatResult, 16f);
 
-        useCardButton = UIFactory.CreateButton(panel.transform, "UseCardButton", "USAR CARTA", OnUseCardClicked, UIFactory.OkColor, 22f);
-        UIFactory.Place((RectTransform)useCardButton.transform, new Vector2(0.5f, 0f), new Vector2(-245f, 24f), new Vector2(230f, 70f));
+        useCardButton = UIFactory.CreateButton(panel.transform, "UseCardButton", "USAR CARTA", OnUseCardClicked, UIFactory.OkColor, 18f);
+        UIFactory.Place((RectTransform)useCardButton.transform, new Vector2(0.5f, 0f), new Vector2(-195f, 14f), new Vector2(180f, 62f));
 
-        skipCardButton = UIFactory.CreateButton(panel.transform, "SkipCardButton", "NO USAR CARTA", OnSkipCardClicked, UIFactory.ButtonColor, 22f);
-        UIFactory.Place((RectTransform)skipCardButton.transform, new Vector2(0.5f, 0f), new Vector2(0f, 24f), new Vector2(230f, 70f));
+        skipCardButton = UIFactory.CreateButton(panel.transform, "SkipCardButton", "NO USAR CARTA", OnSkipCardClicked, UIFactory.ButtonColor, 18f);
+        UIFactory.Place((RectTransform)skipCardButton.transform, new Vector2(0.5f, 0f), new Vector2(0f, 14f), new Vector2(180f, 62f));
 
-        combatRollButton = UIFactory.CreateButton(panel.transform, "CombatRollButton", "TIRAR DADO DE COMBATE", OnCombatRollClicked, UIFactory.DangerColor, 20f);
-        UIFactory.Place((RectTransform)combatRollButton.transform, new Vector2(0.5f, 0f), new Vector2(245f, 24f), new Vector2(230f, 70f));
+        combatRollButton = UIFactory.CreateButton(panel.transform, "CombatRollButton", "TIRAR DADO", OnCombatRollClicked, UIFactory.DangerColor, 18f);
+        UIFactory.Place((RectTransform)combatRollButton.transform, new Vector2(0.5f, 0f), new Vector2(195f, 14f), new Vector2(180f, 62f));
     }
 
     private void BuildEndPanel(Transform root)
@@ -269,22 +363,32 @@ public class GameHUD : MonoBehaviour
         endPanel = overlay.gameObject;
 
         Image panel = UIFactory.CreatePanel(overlay.transform, "EndPanel", UIFactory.PanelColor);
-        UIFactory.Place(panel.rectTransform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(820f, 480f));
+        UIFactory.Place(panel.rectTransform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(720f, 440f));
+        panel.gameObject.AddComponent<ScaleToFit>();
 
-        endTitle = UIFactory.CreateText(panel.transform, "Title", "PARTIDA TERMINADA", 56f);
-        UIFactory.Place(endTitle.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -24f), new Vector2(780f, 80f));
+        endTitle = UIFactory.CreateText(panel.transform, "Title", "PARTIDA TERMINADA", 48f);
+        UIFactory.Place(endTitle.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -20f), new Vector2(680f, 70f));
         endTitle.color = UIFactory.AccentColor;
 
-        endBody = UIFactory.CreateText(panel.transform, "Body", "", 30f);
-        UIFactory.Place(endBody.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -120f), new Vector2(780f, 200f));
+        endBody = UIFactory.CreateText(panel.transform, "Body", "", 26f);
+        UIFactory.Place(endBody.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -100f), new Vector2(680f, 200f));
+        AutoSize(endBody, 16f);
 
-        restartButton = UIFactory.CreateButton(panel.transform, "RestartButton", "REINICIAR", OnRestartClicked, UIFactory.OkColor, 30f);
-        UIFactory.Place((RectTransform)restartButton.transform, new Vector2(0.5f, 0f), new Vector2(-170f, 30f), new Vector2(300f, 80f));
+        restartButton = UIFactory.CreateButton(panel.transform, "RestartButton", "REINICIAR", OnRestartClicked, UIFactory.OkColor, 28f);
+        UIFactory.Place((RectTransform)restartButton.transform, new Vector2(0.5f, 0f), new Vector2(-160f, 26f), new Vector2(290f, 78f));
 
-        Button menuButton = UIFactory.CreateButton(panel.transform, "MenuButton", "VOLVER AL MENÚ", OnMenuClicked, UIFactory.ButtonColor, 28f);
-        UIFactory.Place((RectTransform)menuButton.transform, new Vector2(0.5f, 0f), new Vector2(170f, 30f), new Vector2(300f, 80f));
+        Button menuButton = UIFactory.CreateButton(panel.transform, "MenuButton", "VOLVER AL MENÚ", OnMenuClicked, UIFactory.ButtonColor, 24f);
+        UIFactory.Place((RectTransform)menuButton.transform, new Vector2(0.5f, 0f), new Vector2(160f, 26f), new Vector2(290f, 78f));
 
         endPanel.SetActive(false);
+    }
+
+    /// <summary>Shrinks long texts instead of overflowing on small screens.</summary>
+    private static void AutoSize(TextMeshProUGUI text, float minSize)
+    {
+        text.enableAutoSizing = true;
+        text.fontSizeMin = minSize;
+        text.fontSizeMax = text.fontSize;
     }
 
     // =========================================================
@@ -322,10 +426,12 @@ public class GameHUD : MonoBehaviour
         RefreshEnd(turns, game, local);
         RefreshToasts();
 
+        RefreshViewButton();
+
         NetworkManager nm = NetworkManager.Singleton;
 
         if (nm != null)
-            networkText.text = "Rueda: zoom · C: vista general     " + (nm.IsHost ? "HOST" : "CLIENTE") + " · " + PlayerNetworkData.All.Count + " jugadores · Seed " + game.BoardSeed.Value;
+            networkText.text = (ResponsiveCanvas.IsTouchDevice ? "Pellizca: zoom     " : "Rueda: zoom · C: vista general     ") + (nm.IsHost ? "HOST" : "CLIENTE") + " · " + PlayerNetworkData.All.Count + " jugadores · Seed " + game.BoardSeed.Value;
     }
 
     private void RefreshTurn(TurnManager turns, PlayerNetworkData local)
@@ -358,7 +464,7 @@ public class GameHUD : MonoBehaviour
         {
             case TurnState.WaitingForRoll: hint = turns.IsLocalPlayersTurn ? "Pulsa TIRAR DADO" : "Esperando la tirada"; break;
             case TurnState.Moving:
-                hint = turns.IsLocalPlayersTurn ? $"Muévete con WASD / flechas · {turns.MovesRemaining.Value} restantes" : $"Moviéndose · {turns.MovesRemaining.Value} restantes";
+                hint = turns.IsLocalPlayersTurn ? $"Muévete con {(ResponsiveCanvas.IsTouchDevice ? "las flechas" : "WASD / flechas")} · {turns.MovesRemaining.Value} restantes" : $"Moviéndose · {turns.MovesRemaining.Value} restantes";
                 if (turns.WallWalk.Value) hint += " · <color=#D080FF>atraviesa paredes</color>";
                 break;
             case TurnState.CheckingTile: hint = "Comprobando casilla..."; break;
@@ -782,6 +888,8 @@ public class GameHUD : MonoBehaviour
         roulette.name = "RouletteWheel";
         roulette.SpinClicked += OnSpinClicked;
         roulette.Build(RouletteConfig.Instance);
+        // The wheel panel is designed big; shrink it on small screens.
+        ScaleToFit.ApplyToChildren(roulette.transform);
         roulette.Hide();
     }
 
@@ -877,6 +985,8 @@ public class GameHUD : MonoBehaviour
             missionResultShown = MissionPhase.None;
             missionMinigame.Finished += success => MissionManager.Instance?.RequestFinishFromLocal(success);
             missionMinigame.Begin(definition, player != null ? player.Name : "?", player != null ? CharacterName(player) : "?", manager.IsLocalMission);
+            // Minigame panels are designed big; shrink them on small screens.
+            ScaleToFit.ApplyToChildren(instance.transform);
 
             // Keep the end screen above the minigame.
             if (endPanel != null)
@@ -974,6 +1084,31 @@ public class GameHUD : MonoBehaviour
     private void OnCombatRollClicked()
     {
         CombatManager.Instance.RequestRollFromLocal();
+    }
+
+    private void OnViewClicked()
+    {
+        if (boardCamera == null)
+            boardCamera = FindFirstObjectByType<BoardCameraController>();
+
+        if (boardCamera != null)
+            boardCamera.ToggleView();
+
+        RefreshViewButton();
+    }
+
+    private void RefreshViewButton()
+    {
+        if (viewButton == null)
+            return;
+
+        if (boardCamera == null)
+            boardCamera = FindFirstObjectByType<BoardCameraController>();
+
+        viewButton.gameObject.SetActive(boardCamera != null);
+
+        if (boardCamera != null)
+            UIFactory.SetLabel(viewButton, boardCamera.IsFollowing ? "VER TABLERO" : "SEGUIR TURNO");
     }
 
     private void OnRestartClicked()

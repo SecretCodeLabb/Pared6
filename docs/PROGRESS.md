@@ -72,6 +72,8 @@
 
 - **Prueba 2 builds (2026-10-07):** `DevAutoPlayer` ampliado (`-autohost`, `-players`, `-games`, `-hardrules`, camino a la misión, cartas especiales); 5 partidas completas entre 2 builds sin errores ni desincronización. Corregida la doble tirada de Silencio líquido en una misma casilla. Detalle en TEST_PLAN.
 
+- **T25 (2026-10-09) Android + UI responsive:** `AndroidBuildSetup` (ajustes y build del APK), `MobilePlatform` (60 FPS, pantalla siempre encendida, horizontal), `ResponsiveCanvas` (Expand + safe area + UI más grande en móviles) en todos los Canvas, `ScaleToFit` (ruleta, misiones, final), HUD reorganizado para 1280×720, dado y anuncio de evento integrados en el HUD, pellizco para zoom y botón de vista. Probado en Play a 2400×1080 (móvil), 2048×1536 (tablet) y 1920×1080. **Pendiente:** el módulo Android no pudo instalarse (disco C: lleno), así que el APK aún no se ha generado.
+
 ## Problemas abiertos
 - Cliente cerrado a la fuerza: ~30 s hasta marcarse DESCONECTADO (timeout de Unity Transport; ajustable en `UnityTransport.DisconnectTimeoutMS`).
 - Timeout de turno implementado pero no probado (desactivado por defecto).

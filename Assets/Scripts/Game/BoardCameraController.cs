@@ -5,7 +5,8 @@ using UnityEngine.InputSystem;
 /// Game camera on the Main Camera of Mapa. Keeps the camera's own angle and field of view and
 /// moves it smoothly between:
 /// - Overview: the whole board (while loading, at game over, or when toggled with C);
-/// - Follow: the active player's pawn (everyone sees the current turn), zoomable with the wheel.
+/// - Follow: the active player's pawn (everyone sees the current turn), zoomable with the wheel
+///   or a two-finger pinch on touch screens.
 /// MapGenerator calls SetBoardBounds after building the board. Offline it follows the local pawn.
 /// </summary>
 [RequireComponent(typeof(Camera))]
@@ -30,6 +31,8 @@ public class BoardCameraController : MonoBehaviour
     [SerializeField] private float smoothTime = 0.35f;
     [SerializeField] private float zoomStep = 3f;
     [SerializeField] private Key toggleKey = Key.C;
+    [Tooltip("World units of zoom per screen pixel of pinch.")]
+    [SerializeField] private float pinchZoomSpeed = 0.05f;
 
     private Camera cam;
     private bool hasBounds;
@@ -44,8 +47,15 @@ public class BoardCameraController : MonoBehaviour
     private float distanceVelocity;
 
     private PlayerController offlinePawn;
+    private float lastPinchDistance = -1f;
 
     public bool IsFollowing => followActivePlayer;
+
+    /// <summary>Switches between following the turn and the whole-board view (C key / HUD button).</summary>
+    public void ToggleView()
+    {
+        followActivePlayer = !followActivePlayer;
+    }
 
     private void Awake()
     {
@@ -82,7 +92,9 @@ public class BoardCameraController : MonoBehaviour
         Keyboard keyboard = Keyboard.current;
 
         if (keyboard != null && keyboard[toggleKey].wasPressedThisFrame)
-            followActivePlayer = !followActivePlayer;
+            ToggleView();
+
+        UpdatePinch();
 
         Mouse mouse = Mouse.current;
 
@@ -92,10 +104,53 @@ public class BoardCameraController : MonoBehaviour
 
             if (Mathf.Abs(scroll) > 0.01f)
             {
-                followDistance -= Mathf.Sign(scroll) * zoomStep;
-                followDistance = Mathf.Clamp(followDistance, minDistance, overviewDistance * maxDistanceFactor);
+                Zoom(-Mathf.Sign(scroll) * zoomStep);
             }
         }
+    }
+
+    private void UpdatePinch()
+    {
+        Touchscreen touchscreen = Touchscreen.current;
+        int pressed = 0;
+        Vector2 a = Vector2.zero, b = Vector2.zero;
+
+        if (touchscreen != null)
+        {
+            foreach (var touch in touchscreen.touches)
+            {
+                if (!touch.press.isPressed)
+                    continue;
+
+                if (pressed == 0) a = touch.position.ReadValue();
+                else if (pressed == 1) b = touch.position.ReadValue();
+                pressed++;
+            }
+        }
+
+        if (pressed < 2)
+        {
+            lastPinchDistance = -1f;
+            return;
+        }
+
+        float pinch = Vector2.Distance(a, b);
+
+        // Pinching in the overview switches to following the turn, then zooms.
+        if (lastPinchDistance > 0f)
+        {
+            if (!followActivePlayer && Mathf.Abs(pinch - lastPinchDistance) > 2f)
+                followActivePlayer = true;
+
+            Zoom(-(pinch - lastPinchDistance) * pinchZoomSpeed);
+        }
+
+        lastPinchDistance = pinch;
+    }
+
+    private void Zoom(float delta)
+    {
+        followDistance = Mathf.Clamp(followDistance + delta, minDistance, overviewDistance * maxDistanceFactor);
     }
 
     private void LateUpdate()
