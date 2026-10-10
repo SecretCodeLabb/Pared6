@@ -134,6 +134,12 @@ para 6000.3.7f1 (necesita ~13 GB libres en el disco del Editor).
 - `PPOP/Android/Apply Android Settings`: nombre "Pared", paquete `com.ppop.pared`, IL2CPP ARM64,
   solo horizontal, permiso de Internet, APK (no .aab). Lo aplican también los menús de build.
 - `PPOP/Android/Build APK` → `Builds/Android/Pared.apk` (`Build APK (Development)` incluye el bot de pruebas).
+  Desde código: `AndroidBuildSetup.Build(false, "D:/JuegoPared/APK1/Pared.apk")`.
+- **Gráficos: solo OpenGL ES 3.** Con Vulkan el tablero (casillas URP/Lit) no se dibujaba en GPUs Mali
+  (moto g20); fichas y UI sí. No volver a activar Vulkan sin probarlo en un móvil real.
+- Depurar en un móvil: Depuración USB + `adb logcat -s Unity` (adb está en el SDK de Unity:
+  `...ƀ0.3.7f1\Editor\Data\PlaybackEngines\AndroidPlayer\SDK\platform-tools`). Para probar una partida,
+  el móvil crea la partida y el Editor se une con la IP del móvil (misma Wi-Fi).
 - Instalar: copiar el APK al móvil y abrirlo (permitir "orígenes desconocidos"). Todos los móviles en la
   misma Wi-Fi; el Host ve su IP en el menú.
 - En Android la app se pausa al pasar a segundo plano: si el Host minimiza el juego, los demás se desconectan.

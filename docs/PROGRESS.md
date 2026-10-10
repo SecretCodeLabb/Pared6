@@ -72,7 +72,8 @@
 
 - **Prueba 2 builds (2026-10-07):** `DevAutoPlayer` ampliado (`-autohost`, `-players`, `-games`, `-hardrules`, camino a la misión, cartas especiales); 5 partidas completas entre 2 builds sin errores ni desincronización. Corregida la doble tirada de Silencio líquido en una misma casilla. Detalle en TEST_PLAN.
 
-- **T25 (2026-10-09) Android + UI responsive:** `AndroidBuildSetup` (ajustes y build del APK), `MobilePlatform` (60 FPS, pantalla siempre encendida, horizontal), `ResponsiveCanvas` (Expand + safe area + UI más grande en móviles) en todos los Canvas, `ScaleToFit` (ruleta, misiones, final), HUD reorganizado para 1280×720, dado y anuncio de evento integrados en el HUD, pellizco para zoom y botón de vista. Probado en Play a 2400×1080 (móvil), 2048×1536 (tablet) y 1920×1080. **Pendiente:** el módulo Android no pudo instalarse (disco C: lleno), así que el APK aún no se ha generado.
+- **T25 (2026-10-09) Android + UI responsive:** `AndroidBuildSetup` (ajustes y build del APK), `MobilePlatform` (60 FPS, pantalla siempre encendida, horizontal), `ResponsiveCanvas` (Expand + safe area + UI más grande en móviles) en todos los Canvas, `ScaleToFit` (ruleta, misiones, final), HUD reorganizado para 1280×720, dado y anuncio de evento integrados en el HUD, pellizco para zoom y botón de vista. Probado en Play a 2400×1080 (móvil), 2048×1536 (tablet) y 1920×1080. Módulo Android instalado y APK generado (`D:/JuegoPared/APK1/Pared.apk`, ~58 MB).
+- **T25b (2026-10-10) Fix tablero invisible en Android:** con Vulkan el tablero no se veía en GPU Mali (moto g20). APK forzado a OpenGL ES 3 (`AndroidBuildSetup.ApplySettings`). Verificado en el móvil real (Host) con el Editor como cliente: tablero, cuartos, eventos y fichas visibles.
 
 ## Problemas abiertos
 - Cliente cerrado a la fuerza: ~30 s hasta marcarse DESCONECTADO (timeout de Unity Transport; ajustable en `UnityTransport.DisconnectTimeoutMS`).
