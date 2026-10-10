@@ -29,6 +29,11 @@ public static class AndroidBuildSetup
         PlayerSettings.SetScriptingBackend(android, ScriptingImplementation.IL2CPP);
         PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
 
+        // OpenGL ES 3 only: with Vulkan the board (hundreds of URP/Lit tiles) did not render on Mali GPUs
+        // (moto g20), while pawns and UI did. Every Android phone from the last ~10 years has GLES3.
+        PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.Android, false);
+        PlayerSettings.SetGraphicsAPIs(BuildTarget.Android, new[] { UnityEngine.Rendering.GraphicsDeviceType.OpenGLES3 });
+
         // Board game: landscape only.
         PlayerSettings.defaultInterfaceOrientation = UIOrientation.AutoRotation;
         PlayerSettings.allowedAutorotateToPortrait = false;
