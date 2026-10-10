@@ -138,7 +138,7 @@ para 6000.3.7f1 (necesita ~13 GB libres en el disco del Editor).
 - **Gráficos: solo OpenGL ES 3.** Con Vulkan el tablero (casillas URP/Lit) no se dibujaba en GPUs Mali
   (moto g20); fichas y UI sí. No volver a activar Vulkan sin probarlo en un móvil real.
 - Depurar en un móvil: Depuración USB + `adb logcat -s Unity` (adb está en el SDK de Unity:
-  `...ƀ0.3.7f1\Editor\Data\PlaybackEngines\AndroidPlayer\SDK\platform-tools`). Para probar una partida,
+  `...\6000.3.7f1\Editor\Data\PlaybackEngines\AndroidPlayer\SDK\platform-tools`). Para probar una partida,
   el móvil crea la partida y el Editor se une con la IP del móvil (misma Wi-Fi).
 - Instalar: copiar el APK al móvil y abrirlo (permitir "orígenes desconocidos"). Todos los móviles en la
   misma Wi-Fi; el Host ve su IP en el menú.
