@@ -63,9 +63,15 @@ public static class AndroidBuildSetup
 
     public static BuildReport Build(bool development)
     {
+        return Build(development, OutputPath);
+    }
+
+    /// <summary>Builds the APK to any path (e.g. D:/JuegoPared/APK1/Pared.apk).</summary>
+    public static BuildReport Build(bool development, string outputPath)
+    {
         ApplySettings();
 
-        string directory = Path.GetDirectoryName(OutputPath);
+        string directory = Path.GetDirectoryName(outputPath);
 
         if (!string.IsNullOrEmpty(directory))
             Directory.CreateDirectory(directory);
@@ -73,7 +79,7 @@ public static class AndroidBuildSetup
         BuildPlayerOptions options = new BuildPlayerOptions
         {
             scenes = EnabledScenes(),
-            locationPathName = OutputPath,
+            locationPathName = outputPath,
             target = BuildTarget.Android,
             targetGroup = BuildTargetGroup.Android,
             options = development ? BuildOptions.Development : BuildOptions.None
@@ -83,7 +89,7 @@ public static class AndroidBuildSetup
         BuildSummary summary = report.summary;
 
         if (summary.result == BuildResult.Succeeded)
-            Debug.Log($"[PPOP] APK generado: {OutputPath} ({summary.totalSize / (1024 * 1024)} MB, {summary.totalTime.TotalSeconds:0}s)");
+            Debug.Log($"[PPOP] APK generado: {outputPath} ({summary.totalSize / (1024 * 1024)} MB, {summary.totalTime.TotalSeconds:0}s)");
         else
             Debug.LogError($"[PPOP] Build de Android falló: {summary.result} ({summary.totalErrors} errores). ¿Está instalado Android Build Support con SDK/NDK/OpenJDK?");
 
