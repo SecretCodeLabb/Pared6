@@ -15,7 +15,11 @@ public class MapGenerator : MonoBehaviour
     public int height = 8;
 
     [Header("Tile")]
+    [Tooltip("Logic tile (Tile + TileView). Used by the side rooms, and by the central board when centralTilePrefab is empty.")]
     public GameObject tilePrefab;
+
+    [Tooltip("Tile used for the central maze (e.g. the Nivel 0 model). Empty = tilePrefab.")]
+    public GameObject centralTilePrefab;
     public float tileSize = 2f;
 
     [Header("Connections")]
@@ -36,6 +40,13 @@ public class MapGenerator : MonoBehaviour
     public GameObject eastRoomPrefab;
     public GameObject westRoomPrefab;
 
+    [Header("Prefab Rooms")]
+    [Tooltip("Side rooms are a fixed prefab (RoomEnvironment) laid over an open square of tiles instead of a procedural maze. Movement, events and the mission tile keep using the tiles.")]
+    public bool usePrefabRooms = true;
+
+    [Tooltip("Room prefab for every character whose room style (RoomBuilder.environmentPrefab) has none. Its sizeInTiles sets the size of all side rooms.")]
+    public GameObject defaultRoomEnvironment;
+
     [Header("Room Placement")]
     [Tooltip("Not used: rooms are attached directly to the board so their entrance lines up with the exit.")]
     public float roomDistance = 0f;
@@ -48,6 +59,8 @@ public class MapGenerator : MonoBehaviour
     [Header("Seed")]
     public bool randomizeSeed = true;
     public int seed;
+
+    private GameObject CentralTilePrefab => centralTilePrefab != null && centralTilePrefab.GetComponent<Tile>() != null ? centralTilePrefab : tilePrefab;
 
     /// <summary>The logical layout of the last generated board.</summary>
     public BoardLayout Layout { get; private set; }
@@ -117,15 +130,18 @@ public class MapGenerator : MonoBehaviour
         }
 
         RoomBuilder roomTemplate = GetRoomTemplate();
+        bool prefabRooms = PrefabRoomsActive;
+        int prefabRoomSize = prefabRooms ? PrefabRoomSize() : 0;
 
         BoardLayout.Settings settings = new BoardLayout.Settings
         {
             centerWidth = width,
             centerHeight = height,
             centerExtraPathChance = extraPathChance,
-            roomWidth = roomTemplate != null ? roomTemplate.width : 5,
-            roomDepth = roomTemplate != null ? roomTemplate.height : 5,
+            roomWidth = prefabRooms ? prefabRoomSize : roomTemplate != null ? roomTemplate.width : 5,
+            roomDepth = prefabRooms ? prefabRoomSize : roomTemplate != null ? roomTemplate.height : 5,
             roomExtraPathChance = roomTemplate != null ? roomTemplate.extraPathChance : extraPathChance,
+            openRooms = prefabRooms,
             north = generateRooms && northConnection && northRoomPrefab != null,
             south = generateRooms && southConnection && southRoomPrefab != null,
             east = generateRooms && eastConnection && eastRoomPrefab != null,
@@ -146,8 +162,10 @@ public class MapGenerator : MonoBehaviour
             bool central = region == BoardRegion.Center;
             Transform parent = central ? transform : GetContainer(containers, region);
 
+            bool logicOnly = !central && prefabRooms;
+
             GameObject tileObject = Instantiate(
-                central ? tilePrefab : RoomTilePrefab(region, defaultRoomTile),
+                central ? CentralTilePrefab : logicOnly ? tilePrefab : RoomTilePrefab(region, defaultRoomTile),
                 new Vector3(cell.x * tileSize, 0f, cell.y * tileSize),
                 Quaternion.identity,
                 parent
@@ -175,9 +193,16 @@ public class MapGenerator : MonoBehaviour
             tile.eastWall = (mask & BoardLayout.WallEast) != 0;
             tile.westWall = (mask & BoardLayout.WallWest) != 0;
             tile.UpdateVisual();
+
+            // Prefab rooms: the tile only carries movement, events and the mission marker.
+            if (logicOnly)
+                HideTileVisuals(tileObject);
         }
 
-        DecorateRooms(containers);
+        if (prefabRooms)
+            SpawnRoomEnvironments(containers);
+
+        DecorateRooms(containers, !prefabRooms);
 
         // EventManager.Awake may not have run yet (Awake order is not guaranteed).
         EventManager events = EventManager.Instance != null ? EventManager.Instance : FindFirstObjectByType<EventManager>();
@@ -188,6 +213,10 @@ public class MapGenerator : MonoBehaviour
         }
 
         FrameCamera();
+
+        // Backrooms lights / mood for the central maze (cheap, visual only).
+        if (TryGetComponent(out BackroomsAmbience ambience))
+            ambience.Build(this);
 
         Debug.Log("Mapa generado. Seed: " + seed + " · Casillas: " + Layout.Cells.Count);
     }
@@ -285,7 +314,7 @@ public class MapGenerator : MonoBehaviour
     /// Scatters each room's decoration props on its floor and adds the room name. Uses its own
     /// seeded RNG, so every instance gets the same props without touching wall generation.
     /// </summary>
-    private void DecorateRooms(Transform[] containers)
+    private void DecorateRooms(Transform[] containers, bool scatterProps)
     {
         BoardRegion[] sides = { BoardRegion.North, BoardRegion.South, BoardRegion.East, BoardRegion.West };
 
@@ -300,7 +329,7 @@ public class MapGenerator : MonoBehaviour
             List<Vector2Int> cells = Layout.CellsIn(side);
             System.Random rng = new System.Random(unchecked(seed * 31 + (int)side * 7919));
 
-            List<GameObject> props = style.decorations.FindAll(p => p != null);
+            List<GameObject> props = scatterProps ? style.decorations.FindAll(p => p != null) : new List<GameObject>();
 
             if (props.Count > 0)
             {
@@ -331,6 +360,115 @@ public class MapGenerator : MonoBehaviour
             if (!string.IsNullOrEmpty(style.themeName) && cells.Count > 0)
                 CreateRoomLabel(container, cells, style);
         }
+    }
+
+    // =========================================================
+    // PREFAB ROOMS
+    // =========================================================
+
+    private bool PrefabRoomsActive => usePrefabRooms && generateRooms && defaultRoomEnvironment != null;
+
+    private int PrefabRoomSize()
+    {
+        return defaultRoomEnvironment.TryGetComponent(out RoomEnvironment environment) ? environment.sizeInTiles : 7;
+    }
+
+    /// <summary>Room prefab of a side: the character's own (RoomBuilder.environmentPrefab) or the default.</summary>
+    public GameObject GetRoomEnvironmentPrefab(BoardRegion side)
+    {
+        RoomBuilder style = GetRoomStyle(side);
+        return style != null && style.environmentPrefab != null ? style.environmentPrefab : defaultRoomEnvironment;
+    }
+
+    private static void HideTileVisuals(GameObject tileObject)
+    {
+        foreach (Renderer renderer in tileObject.GetComponentsInChildren<Renderer>(true))
+            renderer.enabled = false;
+    }
+
+    /// <summary>
+    /// Places each side's room prefab over its tiles: centred on the room, entrance (prefab -Z)
+    /// facing the central board and, if fitToTiles, scaled to cover the room's tiles exactly.
+    /// </summary>
+    private void SpawnRoomEnvironments(Transform[] containers)
+    {
+        BoardRegion[] sides = { BoardRegion.North, BoardRegion.South, BoardRegion.East, BoardRegion.West };
+
+        foreach (BoardRegion side in sides)
+        {
+            Transform container = containers[(int)side];
+            GameObject prefab = GetRoomEnvironmentPrefab(side);
+            List<Vector2Int> cells = Layout.CellsIn(side);
+
+            if (container == null || prefab == null || cells.Count == 0)
+                continue;
+
+            Vector2 min = new Vector2(float.MaxValue, float.MaxValue);
+            Vector2 max = new Vector2(float.MinValue, float.MinValue);
+
+            foreach (Vector2Int cell in cells)
+            {
+                min = Vector2.Min(min, cell);
+                max = Vector2.Max(max, cell);
+            }
+
+            Vector3 center = new Vector3((min.x + max.x) * 0.5f * tileSize, 0f, (min.y + max.y) * 0.5f * tileSize);
+            float footprint = (max.x - min.x + 1f) * tileSize;
+
+            // Spawn unrotated at the origin to measure the prefab's own footprint.
+            GameObject room = Instantiate(prefab, Vector3.zero, Quaternion.identity, container);
+            room.name = "Environment_" + side;
+
+            Vector3 offset = Vector3.zero;
+
+            if (room.TryGetComponent(out RoomEnvironment environment) && environment.fitToTiles &&
+                TryGetRendererBounds(room, out Bounds bounds) && Mathf.Max(bounds.size.x, bounds.size.z) > 0.001f)
+            {
+                float scale = footprint / Mathf.Max(bounds.size.x, bounds.size.z);
+                room.transform.localScale *= scale;
+                offset = new Vector3(-bounds.center.x, 0f, -bounds.center.z) * scale;
+            }
+
+            Quaternion rotation = Quaternion.Euler(0f, EntranceYaw(side), 0f);
+            room.transform.SetPositionAndRotation(center + rotation * offset, rotation);
+
+            // Purely visual: tiles handle movement.
+            foreach (Collider collider in room.GetComponentsInChildren<Collider>())
+                Destroy(collider);
+        }
+    }
+
+    /// <summary>Yaw that turns the prefab's entrance (-Z) towards the central board.</summary>
+    private static float EntranceYaw(BoardRegion side)
+    {
+        switch (side)
+        {
+            case BoardRegion.South: return 180f;
+            case BoardRegion.East: return 90f;
+            case BoardRegion.West: return -90f;
+            default: return 0f;
+        }
+    }
+
+    private static bool TryGetRendererBounds(GameObject root, out Bounds bounds)
+    {
+        bounds = default;
+        bool found = false;
+
+        foreach (Renderer renderer in root.GetComponentsInChildren<Renderer>())
+        {
+            if (!found)
+            {
+                bounds = renderer.bounds;
+                found = true;
+            }
+            else
+            {
+                bounds.Encapsulate(renderer.bounds);
+            }
+        }
+
+        return found;
     }
 
     private void CreateRoomLabel(Transform container, List<Vector2Int> cells, RoomBuilder style)

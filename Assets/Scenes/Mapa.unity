@@ -205,6 +205,7 @@ GameObject:
   m_Component:
   - component: {fileID: 238435667}
   - component: {fileID: 238435666}
+  - component: {fileID: 238435668}
   m_Layer: 0
   m_Name: MapGenerator
   m_TagString: Untagged
@@ -227,6 +228,7 @@ MonoBehaviour:
   width: 11
   height: 11
   tilePrefab: {fileID: 5451176648331968537, guid: c8e43250d00969a4681423e99e9c835e, type: 3}
+  centralTilePrefab: {fileID: 4552350357532995928, guid: 8b98a53ec4a00cd4ca43399746d9485e, type: 3}
   tileSize: 2
   northConnection: 1
   southConnection: 1
@@ -238,6 +240,8 @@ MonoBehaviour:
   southRoomPrefab: {fileID: 648718039112685919, guid: bc1396864591eb04da03af705551debd, type: 3}
   eastRoomPrefab: {fileID: 648718039112685919, guid: bc1396864591eb04da03af705551debd, type: 3}
   westRoomPrefab: {fileID: 648718039112685919, guid: bc1396864591eb04da03af705551debd, type: 3}
+  usePrefabRooms: 1
+  defaultRoomEnvironment: {fileID: 4012314479368013312, guid: 8c95fec44aef15a45a97c4f799abfd53, type: 3}
   roomDistance: 0
   autoFrameCamera: 1
   cameraMargin: 1.25
@@ -258,6 +262,34 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &238435668
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 238435665}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8de385c95a95fa5478d36e08c68e9129, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BackroomsAmbience
+  quality: 0
+  applyLighting: 1
+  sunColor: {r: 1, g: 0.92, b: 0.68, a: 1}
+  sunIntensity: 0.85
+  ambientColor: {r: 0.46, g: 0.42, b: 0.28, a: 1}
+  backgroundColor: {r: 0.07, g: 0.065, b: 0.045, a: 1}
+  spacing: 3
+  lowSpacing: 4
+  poolSize: 4.2
+  poolColor: {r: 1, g: 0.9, b: 0.55, a: 0.32}
+  tubeSize: {x: 1.5, y: 0.32}
+  tubeColor: {r: 1, g: 0.97, b: 0.82, a: 0.85}
+  flickerEvery: {x: 2.5, y: 6}
+  blackoutEvery: {x: 25, y: 50}
+  dust: 1
+  maxDust: 45
 --- !u!1 &525145491
 GameObject:
   m_ObjectHideFlags: 0
@@ -417,6 +449,7 @@ MonoBehaviour:
   smoothTime: 0.35
   zoomStep: 3
   toggleKey: 17
+  pinchZoomSpeed: 0.05
 --- !u!1 &943605607
 GameObject:
   m_ObjectHideFlags: 0
@@ -1381,6 +1414,151 @@ MonoBehaviour:
         byte0123: 0
         byte0124: 0
         byte0125: 0
+  LastCardSelfText:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue:
+      utf8LengthInBytes: 0
+      bytes:
+        offset0000:
+          byte0000: 0
+          byte0001: 0
+          byte0002: 0
+          byte0003: 0
+          byte0004: 0
+          byte0005: 0
+          byte0006: 0
+          byte0007: 0
+          byte0008: 0
+          byte0009: 0
+          byte0010: 0
+          byte0011: 0
+          byte0012: 0
+          byte0013: 0
+          byte0014: 0
+          byte0015: 0
+        offset0016:
+          byte0000: 0
+          byte0001: 0
+          byte0002: 0
+          byte0003: 0
+          byte0004: 0
+          byte0005: 0
+          byte0006: 0
+          byte0007: 0
+          byte0008: 0
+          byte0009: 0
+          byte0010: 0
+          byte0011: 0
+          byte0012: 0
+          byte0013: 0
+          byte0014: 0
+          byte0015: 0
+        offset0032:
+          byte0000: 0
+          byte0001: 0
+          byte0002: 0
+          byte0003: 0
+          byte0004: 0
+          byte0005: 0
+          byte0006: 0
+          byte0007: 0
+          byte0008: 0
+          byte0009: 0
+          byte0010: 0
+          byte0011: 0
+          byte0012: 0
+          byte0013: 0
+          byte0014: 0
+          byte0015: 0
+        offset0048:
+          byte0000: 0
+          byte0001: 0
+          byte0002: 0
+          byte0003: 0
+          byte0004: 0
+          byte0005: 0
+          byte0006: 0
+          byte0007: 0
+          byte0008: 0
+          byte0009: 0
+          byte0010: 0
+          byte0011: 0
+          byte0012: 0
+          byte0013: 0
+          byte0014: 0
+          byte0015: 0
+        offset0064:
+          byte0000: 0
+          byte0001: 0
+          byte0002: 0
+          byte0003: 0
+          byte0004: 0
+          byte0005: 0
+          byte0006: 0
+          byte0007: 0
+          byte0008: 0
+          byte0009: 0
+          byte0010: 0
+          byte0011: 0
+          byte0012: 0
+          byte0013: 0
+          byte0014: 0
+          byte0015: 0
+        offset0080:
+          byte0000: 0
+          byte0001: 0
+          byte0002: 0
+          byte0003: 0
+          byte0004: 0
+          byte0005: 0
+          byte0006: 0
+          byte0007: 0
+          byte0008: 0
+          byte0009: 0
+          byte0010: 0
+          byte0011: 0
+          byte0012: 0
+          byte0013: 0
+          byte0014: 0
+          byte0015: 0
+        offset0096:
+          byte0000: 0
+          byte0001: 0
+          byte0002: 0
+          byte0003: 0
+          byte0004: 0
+          byte0005: 0
+          byte0006: 0
+          byte0007: 0
+          byte0008: 0
+          byte0009: 0
+          byte0010: 0
+          byte0011: 0
+          byte0012: 0
+          byte0013: 0
+          byte0014: 0
+          byte0015: 0
+        byte0112: 0
+        byte0113: 0
+        byte0114: 0
+        byte0115: 0
+        byte0116: 0
+        byte0117: 0
+        byte0118: 0
+        byte0119: 0
+        byte0120: 0
+        byte0121: 0
+        byte0122: 0
+        byte0123: 0
+        byte0124: 0
+        byte0125: 0
+  LastCardPlayerId:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: -1
   IsDuel:
     UpdateTraits:
       MinSecondsBetweenUpdates: 0
@@ -1440,6 +1618,16 @@ MonoBehaviour:
       MaxSecondsBetweenUpdates: 0
     m_InternalValue: 0
   LastRoll:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: 0
+  RollCount:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: 0
+  DiceRolling:
     UpdateTraits:
       MinSecondsBetweenUpdates: 0
       MaxSecondsBetweenUpdates: 0
