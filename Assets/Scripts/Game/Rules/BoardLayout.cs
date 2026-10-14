@@ -32,6 +32,8 @@ public class BoardLayout
         public int roomWidth;   // along the side the room is attached to
         public int roomDepth;   // away from the central board
         public float roomExtraPathChance;
+        // Prefab rooms: no maze inside the room (its walls and props come from the room prefab).
+        public bool openRooms;
         public bool north;
         public bool south;
         public bool east;
@@ -186,7 +188,11 @@ public class BoardLayout
         entrance = exit + towardsRoom;
 
         AddRect(side, x, y, w, h);
-        CarveRegion(side, new Vector2Int(x + w / 2, y + h / 2), s.roomExtraPathChance, rng);
+
+        if (s.openRooms)
+            OpenRegion(side);
+        else
+            CarveRegion(side, new Vector2Int(x + w / 2, y + h / 2), s.roomExtraPathChance, rng);
 
         // The only link between the room and the central board.
         Open(exit, towardsRoom);
@@ -251,6 +257,22 @@ public class BoardLayout
                 Open(cell, Vector2Int.right);
 
             if (InRegion(cell + Vector2Int.up, region) && rng.NextDouble() < extraPathChance)
+                Open(cell, Vector2Int.up);
+        }
+    }
+
+    /// <summary>Removes every inner wall of the region (only its border stays closed).</summary>
+    private void OpenRegion(BoardRegion region)
+    {
+        foreach (Vector2Int cell in orderedCells)
+        {
+            if (regions[cell] != region)
+                continue;
+
+            if (InRegion(cell + Vector2Int.right, region))
+                Open(cell, Vector2Int.right);
+
+            if (InRegion(cell + Vector2Int.up, region))
                 Open(cell, Vector2Int.up);
         }
     }

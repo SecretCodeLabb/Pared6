@@ -29,7 +29,10 @@ public class RoomBuilder : MonoBehaviour
     [Tooltip("Color of the floating room name.")]
     public Color themeLabelColor = Color.white;
 
-    [Tooltip("Props scattered on the floor of this room (any 3D prefab). Colliders are removed at spawn.")]
+    [Tooltip("Fixed room prefab (with RoomEnvironment) for this character. Empty = MapGenerator.defaultRoomEnvironment. Used when MapGenerator.usePrefabRooms is on.")]
+    public GameObject environmentPrefab;
+
+    [Tooltip("Props scattered on the floor of this room (any 3D prefab). Colliders are removed at spawn. Not used with prefab rooms.")]
     public List<GameObject> decorations = new List<GameObject>();
 
     [Tooltip("Chance per tile of spawning one decoration.")]

@@ -398,6 +398,48 @@ public class BoardLayoutTests
     }
 
     [Test]
+    public void OpenRoomsHaveNoInnerWallsOneDoorAndReachableMission()
+    {
+        BoardLayout.Settings settings = Settings(11, 7);
+        settings.openRooms = true;
+
+        for (int seed = 0; seed < 20; seed++)
+        {
+            BoardLayout layout = BoardLayout.Generate(settings, seed);
+            Assert.AreEqual(0, layout.CountAsymmetricWalls(), "seed " + seed);
+            Assert.AreEqual(layout.Cells.Count, layout.Reachable(new Vector2Int(5, 5)).Count, "seed " + seed);
+
+            foreach (BoardRegion r in new[] { BoardRegion.North, BoardRegion.South, BoardRegion.East, BoardRegion.West })
+            {
+                List<Vector2Int> cells = layout.CellsIn(r);
+                Assert.AreEqual(49, cells.Count, r.ToString());
+
+                // Every step between two cells of the same room is allowed.
+                foreach (Vector2Int cell in cells)
+                    foreach (Vector2Int d in BoardLayout.Directions)
+                        if (layout.Contains(cell + d) && layout.RegionOf(cell + d) == r)
+                            Assert.IsTrue(layout.CanMove(cell, d), $"{r} {cell} {d}");
+
+                // Only one way in: from the central exit to the entrance.
+                int doors = 0;
+
+                foreach (Vector2Int cell in cells)
+                    foreach (Vector2Int d in BoardLayout.Directions)
+                        if (layout.Contains(cell + d) && layout.RegionOf(cell + d) != r && layout.CanMove(cell, d))
+                            doors++;
+
+                Assert.AreEqual(1, doors, r.ToString());
+
+                // Mission tile: back row of the room, straight in line with the entrance.
+                Vector2Int mission = layout.MissionCell(r);
+                Vector2Int entrance = layout.Entrances[r];
+                Assert.AreEqual(r, layout.RegionOf(mission), r.ToString());
+                Assert.AreEqual(6, Mathf.Abs(mission.x - entrance.x) + Mathf.Abs(mission.y - entrance.y), r.ToString());
+            }
+        }
+    }
+
+    [Test]
     public void RoomEntranceLinesUpWithCentralExit()
     {
         BoardLayout layout = BoardLayout.Generate(Settings(), 3);
