@@ -13,7 +13,8 @@ MonoBehaviour:
   m_Name: Mission_Trabajadorcansado
   m_EditorClassIdentifier: Pared.Rules::MissionDefinition
   title: Llegar al viernes
-  description: "Termina el papeleo antes de que se acabe el caf\xE9."
+  description: "Corre hacia el viernes saltando los obst\xE1culos de la oficina hasta
+    llegar a 100 puntos."
   icon: {fileID: 0}
-  minigamePrefab: {fileID: 0}
+  minigamePrefab: {fileID: 3855738949575621085, guid: 20cb05d7f066a114ea9a5f83dcd20449, type: 3}
   tileMarkerPrefab: {fileID: 0}

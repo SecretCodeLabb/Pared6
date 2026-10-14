@@ -1,0 +1,87 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &3855738949575621085
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2867787745489972950}
+  - component: {fileID: 194137649361010675}
+  m_Layer: 0
+  m_Name: Minigame_Trabajador
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &2867787745489972950
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3855738949575621085}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &194137649361010675
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3855738949575621085}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f3f578433e3eb4840bcb57181bb49c3c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::WorkerRunnerMinigame
+  background: {fileID: 21300000, guid: dcd1b31508920e1458ffc4bc213fdfbd, type: 3}
+  groundTexture: {fileID: 2800000, guid: 3d315d1f904cd0245a31e7b2eb11fe7e, type: 3}
+  runFrames:
+  - {fileID: 21300000, guid: 265f3cae4f63e75429996f123d456600, type: 3}
+  jumpSprite: {fileID: 0}
+  crashSprite: {fileID: 0}
+  obstacles:
+  - sprite: {fileID: 21300000, guid: f37b08027247e244aa398fad2ae599f8, type: 3}
+    size: {x: 46, y: 46}
+    heightAboveGround: 0
+    weight: 1.2
+  - sprite: {fileID: 21300000, guid: 039f939535e0c5848b97f90e239cd205, type: 3}
+    size: {x: 76, y: 58}
+    heightAboveGround: 0
+    weight: 1
+  - sprite: {fileID: 21300000, guid: 60109735c09247c49a43b7f28180d689, type: 3}
+    size: {x: 100, y: 63}
+    heightAboveGround: 0
+    weight: 0.8
+  fieldSize: {x: 880, y: 380}
+  groundHeight: 50
+  playerSize: {x: 100, y: 88}
+  playerX: -300
+  hitboxScale: 0.72
+  targetScore: 100
+  pointsPerSecond: 7
+  startSpeed: 380
+  maxSpeed: 720
+  acceleration: 18
+  gravity: 2600
+  jumpVelocity: 900
+  shortHopFactor: 0.45
+  spawnGapSeconds: {x: 0.95, y: 1.9}
+  introSeconds: 2.5
+  endSeconds: 1.5
+  snapshotInterval: 0.05
+  runFrameSeconds: 0.12

@@ -7,7 +7,8 @@ using UnityEngine;
 /// starts the mission (TurnState.Mission); every instance shows the character's minigame
 /// (MissionDefinition.minigamePrefab, or the placeholder); the mission player's result is sent
 /// to the Host. Completing it wins the game (VictoryRules); failing it ends the turn and the
-/// player may retry by entering the tile again.
+/// player retries it at the start of their next turn while still on the tile (TurnManager).
+/// Minigames can stream snapshots to the spectators (SendStateFromLocal / StateReceived).
 /// </summary>
 public class MissionManager : NetworkBehaviour
 {
@@ -69,6 +70,42 @@ public class MissionManager : NetworkBehaviour
     }
 
     // =========================================================
+    // LIVE SPECTATING (minigame snapshots: mission player -> Host -> everyone else)
+    // =========================================================
+
+    private const int MaxStateBytes = 1024;
+
+    /// <summary>Raised on spectators with each snapshot of the mission minigame.</summary>
+    public static event System.Action<byte[]> StateReceived;
+
+    public void SendStateFromLocal(byte[] state)
+    {
+        if (IsSpawned && Phase.Value == MissionPhase.Active && IsLocalMission && state != null && state.Length <= MaxStateBytes)
+            SubmitStateRpc(state);
+    }
+
+    [Rpc(SendTo.Server, Delivery = RpcDelivery.Unreliable)]
+    private void SubmitStateRpc(byte[] state, RpcParams rpcParams = default)
+    {
+        if (Phase.Value != MissionPhase.Active || state == null || state.Length > MaxStateBytes)
+            return;
+
+        PlayerNetworkData sender = PlayerNetworkData.GetByClientId(rpcParams.Receive.SenderClientId);
+
+        if (sender == null || sender.PlayerId.Value != PlayerId.Value)
+            return;
+
+        RelayStateRpc(state);
+    }
+
+    [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
+    private void RelayStateRpc(byte[] state)
+    {
+        if (!IsLocalMission && Phase.Value == MissionPhase.Active)
+            StateReceived?.Invoke(state);
+    }
+
+    // =========================================================
     // SERVER
     // =========================================================
 
@@ -84,7 +121,7 @@ public class MissionManager : NetworkBehaviour
 
         MissionDefinition definition = CurrentDefinition;
         string title = definition != null ? definition.title : "su misión";
-        GameStateManager.Instance.ServerBroadcast($"¡{player.Name} inicia su misión: {title}!");
+        GameStateManager.Instance.ServerBroadcast(player, $"¡Empiezas tu misión: {title}!", $"¡{player.CharacterLabel} inicia su misión: {title}!");
         Debug.Log($"{NetworkConnectionManager.GetInstanceTag()} Misión de {player.Name} ({title}) iniciada.");
     }
 
@@ -133,9 +170,9 @@ public class MissionManager : NetworkBehaviour
         if (success)
             player.MissionCompleted.Value = true;
 
-        GameStateManager.Instance.ServerBroadcast(success
-            ? $"¡{player.Name} completó su misión!"
-            : $"{player.Name} falló su misión");
+        GameStateManager.Instance.ServerBroadcast(player,
+            success ? "¡Completaste tu misión!" : "Fallaste tu misión",
+            success ? $"¡{player.CharacterLabel} completó su misión!" : $"{player.CharacterLabel} falló su misión");
 
         Debug.Log($"{NetworkConnectionManager.GetInstanceTag()} Misión de {player.Name}: {(success ? "COMPLETADA" : "FALLIDA")}");
 

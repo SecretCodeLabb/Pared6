@@ -10,6 +10,8 @@ using UnityEngine;
 ///   3. Assign the prefab to the character's MissionDefinition.minigamePrefab.
 /// The Host receives the result through MissionManager; networking and turns need no changes.
 /// Other players see the same prefab with IsLocalPlayer = false (show a spectator view).
+/// Live spectating: the player's instance calls <see cref="SendState"/> with a small snapshot and
+/// the spectators receive it in <see cref="OnRemoteState"/> (relayed by the Host).
 /// </summary>
 public abstract class MissionMinigame : MonoBehaviour
 {
@@ -21,7 +23,12 @@ public abstract class MissionMinigame : MonoBehaviour
     public string CharacterName { get; private set; }
     public bool IsLocalPlayer { get; private set; }
 
+    /// <summary>Development bot (DevAutoPlayer): the minigame plays itself when supported.</summary>
+    public virtual bool SupportsAutoPlay => false;
+    public bool AutoPlay { get; set; }
+
     private bool finished;
+    private bool listening;
 
     public void Begin(MissionDefinition definition, string playerName, string characterName, bool isLocalPlayer)
     {
@@ -29,6 +36,13 @@ public abstract class MissionMinigame : MonoBehaviour
         PlayerName = playerName;
         CharacterName = characterName;
         IsLocalPlayer = isLocalPlayer;
+
+        if (!isLocalPlayer)
+        {
+            MissionManager.StateReceived += OnRemoteState;
+            listening = true;
+        }
+
         OnBegin();
     }
 
@@ -48,5 +62,23 @@ public abstract class MissionMinigame : MonoBehaviour
 
         finished = true;
         Finished?.Invoke(success);
+    }
+
+    /// <summary>Mission player only: sends a snapshot of the game to the spectators.</summary>
+    protected void SendState(byte[] state)
+    {
+        if (IsLocalPlayer && MissionManager.Instance != null)
+            MissionManager.Instance.SendStateFromLocal(state);
+    }
+
+    /// <summary>Spectators: a snapshot sent by the mission player.</summary>
+    protected virtual void OnRemoteState(byte[] state)
+    {
+    }
+
+    protected virtual void OnDestroy()
+    {
+        if (listening)
+            MissionManager.StateReceived -= OnRemoteState;
     }
 }

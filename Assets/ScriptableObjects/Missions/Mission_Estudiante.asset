@@ -12,8 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 178427cb6a06749409b316dfdbe5236e, type: 3}
   m_Name: Mission_Estudiante
   m_EditorClassIdentifier: Pared.Rules::MissionDefinition
-  title: Examen final
-  description: Estudia lo justo y aprueba el examen.
+  title: "Invasi\xF3n en el aula"
+  description: Destruye las dos filas de enemigos y luego al jefe final antes de
+    que te destruyan.
   icon: {fileID: 0}
-  minigamePrefab: {fileID: 0}
+  minigamePrefab: {fileID: 5115876643291511971, guid: 2cc5ddcd01eb4e245a70246abf95a242, type: 3}
   tileMarkerPrefab: {fileID: 0}

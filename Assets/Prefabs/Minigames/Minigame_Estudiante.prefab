@@ -1,0 +1,82 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &5115876643291511971
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4730222741539198453}
+  - component: {fileID: 3953783193731851265}
+  m_Layer: 0
+  m_Name: Minigame_Estudiante
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &4730222741539198453
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5115876643291511971}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &3953783193731851265
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5115876643291511971}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 25bcb4f6d7d5a5b47b562e1f98875c07, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::StudentInvadersMinigame
+  background: {fileID: 21300000, guid: 781cb3d12377faa469208635b5c6fd38, type: 3}
+  playerSprite: {fileID: 21300000, guid: c71a6c4b50b7f9241805c07ed7cd5bc5, type: 3}
+  enemyRowASprite: {fileID: 21300000, guid: 04d5f540b55ce604485bb5973bc71036, type: 3}
+  enemyRowBSprite: {fileID: 21300000, guid: 25b503f647608b148b80616ab8813cbb, type: 3}
+  bossSprite: {fileID: 21300000, guid: a01f881b3a8bab645af48f3e0720ebd4, type: 3}
+  playerBulletSprite: {fileID: 21300000, guid: 557654eeed989eb4280c1bca6eb53229, type: 3}
+  enemyBulletSprite: {fileID: 21300000, guid: 7359e63ef7727db4dbbf9c95714b98a5, type: 3}
+  fieldSize: {x: 880, y: 500}
+  playerSize: {x: 52, y: 86}
+  enemySize: {x: 54, y: 54}
+  bossSize: {x: 130, y: 230}
+  playerBulletSize: {x: 8, y: 22}
+  enemyBulletSize: {x: 10, y: 22}
+  lives: 3
+  playerSpeed: 460
+  fireCooldown: 0.28
+  playerBulletSpeed: 760
+  invulnerableSeconds: 1.2
+  columns: 8
+  enemySpacing: {x: 84, y: 62}
+  formationSpeed: 55
+  formationSpeedBonus: 140
+  formationStepDown: 20
+  enemyFireInterval: 0.95
+  enemyBulletSpeed: 300
+  bossHealth: 20
+  bossSpeed: 170
+  bossFireInterval: 1.8
+  bossEnragedFireFactor: 0.85
+  introSeconds: 2.5
+  endSeconds: 1.5
+  snapshotInterval: 0.05
