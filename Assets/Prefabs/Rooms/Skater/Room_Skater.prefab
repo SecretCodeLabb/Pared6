@@ -52,6 +52,7 @@ MonoBehaviour:
   extraPathChance: 0.046
   themeName: Cuarto de Skater
   themeLabelColor: {r: 0.965, g: 0.89500004, b: 0.51, a: 1}
+  environmentPrefab: {fileID: 4630712734871687574, guid: e100912b9ef01224895b532338a3f6f9, type: 3}
   decorations:
   - {fileID: 2398762396479680528, guid: 4b3793ac904c05a428cc6f4cca1e91a7, type: 3}
   - {fileID: 5137855902643508716, guid: c34abde982c4fbc4fbe93b6d0698a070, type: 3}
