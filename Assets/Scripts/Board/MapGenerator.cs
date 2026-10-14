@@ -150,6 +150,10 @@ public class MapGenerator : MonoBehaviour
 
         Layout = BoardLayout.Generate(settings, seed);
 
+        // Props of the prefab rooms (ramps, rails...) become walls before the tiles are built.
+        if (prefabRooms)
+            ApplyRoomObstacles();
+
         GameObject defaultRoomTile = roomTemplate != null && roomTemplate.tilePrefab != null
             ? roomTemplate.tilePrefab
             : tilePrefab;
@@ -436,6 +440,76 @@ public class MapGenerator : MonoBehaviour
             foreach (Collider collider in room.GetComponentsInChildren<Collider>())
                 Destroy(collider);
         }
+    }
+
+    /// <summary>World centre of a side room (its cells' bounding box), where its prefab is placed.</summary>
+    private Vector3 RoomCenter(BoardRegion side)
+    {
+        Vector2 min = new Vector2(float.MaxValue, float.MaxValue);
+        Vector2 max = new Vector2(float.MinValue, float.MinValue);
+
+        foreach (Vector2Int cell in Layout.CellsIn(side))
+        {
+            min = Vector2.Min(min, cell);
+            max = Vector2.Max(max, cell);
+        }
+
+        return new Vector3((min.x + max.x) * 0.5f * tileSize, 0f, (min.y + max.y) * 0.5f * tileSize);
+    }
+
+    /// <summary>
+    /// Turns each room prefab's blocked moves (RoomEnvironment.blockedMoves, baked from its props)
+    /// into walls of the board, so players have to go around the props. Same prefab and seed on
+    /// every instance, so the result is identical for everyone.
+    /// </summary>
+    private void ApplyRoomObstacles()
+    {
+        BoardRegion[] sides = { BoardRegion.North, BoardRegion.South, BoardRegion.East, BoardRegion.West };
+
+        foreach (BoardRegion side in sides)
+        {
+            GameObject prefab = GetRoomEnvironmentPrefab(side);
+            RoomEnvironment environment = prefab != null ? prefab.GetComponent<RoomEnvironment>() : null;
+
+            if (environment == null || environment.blockedMoves == null || environment.blockedMoves.Count == 0 ||
+                Layout.CellsIn(side).Count == 0)
+                continue;
+
+            if (environment.fitToTiles || environment.sizeInTiles != PrefabRoomSize())
+            {
+                Debug.LogWarning($"MapGenerator: {prefab.name} tiene obstáculos pero se reescala; se ignoran.");
+                continue;
+            }
+
+            Vector3 center = RoomCenter(side);
+            Quaternion rotation = Quaternion.Euler(0f, EntranceYaw(side), 0f);
+            int added = 0;
+
+            foreach (RoomEnvironment.BlockedMove move in environment.blockedMoves)
+            {
+                Vector2Int a = WorldToCell(center + rotation * environment.LocalCellCenter(move.from));
+                Vector2Int b = WorldToCell(center + rotation * environment.LocalCellCenter(move.to));
+                Vector2Int direction = b - a;
+
+                if (Mathf.Abs(direction.x) + Mathf.Abs(direction.y) != 1 || !Layout.Contains(a) || !Layout.Contains(b) ||
+                    Layout.RegionOf(a) != side || Layout.RegionOf(b) != side)
+                    continue;
+
+                Layout.Close(a, direction);
+                added++;
+            }
+
+            // The bake keeps a path; this only reports a broken prefab.
+            if (Layout.Entrances.TryGetValue(side, out Vector2Int entrance) && !Layout.Reachable(entrance).Contains(Layout.MissionCell(side)))
+                Debug.LogError($"MapGenerator: en {prefab.name} los obstáculos cierran el camino a la misión. Regenera la habitación (PPOP/Rooms).");
+
+            Debug.Log($"MapGenerator: {added} paredes de obstáculos en la habitación {side} ({prefab.name}).");
+        }
+    }
+
+    private Vector2Int WorldToCell(Vector3 world)
+    {
+        return new Vector2Int(Mathf.RoundToInt(world.x / tileSize), Mathf.RoundToInt(world.z / tileSize));
     }
 
     /// <summary>Yaw that turns the prefab's entrance (-Z) towards the central board.</summary>

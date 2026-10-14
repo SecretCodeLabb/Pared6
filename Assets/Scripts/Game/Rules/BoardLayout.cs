@@ -282,6 +282,21 @@ public class BoardLayout
         return regions.TryGetValue(cell, out BoardRegion r) && r == region;
     }
 
+    /// <summary>
+    /// Adds the wall between cell and its neighbour on BOTH sides. Used after generation for the
+    /// props of prefab rooms (RoomEnvironment.blockedMoves) so they block movement like walls.
+    /// </summary>
+    public void Close(Vector2Int cell, Vector2Int direction)
+    {
+        Vector2Int next = cell + direction;
+
+        if (!Contains(cell) || !Contains(next))
+            return;
+
+        walls[cell] |= Bit(direction);
+        walls[next] |= Bit(-direction);
+    }
+
     /// <summary>Removes the wall between cell and its neighbour on BOTH sides.</summary>
     private void Open(Vector2Int cell, Vector2Int direction)
     {

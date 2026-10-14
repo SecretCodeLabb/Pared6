@@ -76,6 +76,15 @@ public static class AndroidBuildSetup
     {
         ApplySettings();
 
+        // Switch the Editor to Android first: an APK built straight from the Windows target (first build
+        // after the switch) rendered the board invisible on the phones, while a rebuild worked.
+        if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.Android &&
+            !EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Android, BuildTarget.Android))
+        {
+            Debug.LogError("[PPOP] No se pudo cambiar la plataforma a Android.");
+            return null;
+        }
+
         string directory = Path.GetDirectoryName(outputPath);
 
         if (!string.IsNullOrEmpty(directory))
