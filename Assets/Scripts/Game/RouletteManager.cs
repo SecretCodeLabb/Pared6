@@ -110,7 +110,7 @@ public class RouletteManager : NetworkBehaviour
         if (Phase.Value != RoulettePhase.WaitingSpin)
             yield break;
 
-        GameStateManager.Instance.ServerBroadcast("La ruleta gira sola");
+        GameStateManager.Instance.ServerBroadcast(player, "Tu ruleta gira sola", $"La ruleta de {player.CharacterLabel} gira sola");
         ServerSpin(player);
     }
 
@@ -203,7 +203,7 @@ public class RouletteManager : NetworkBehaviour
         int amount = option != null ? Mathf.Max(0, option.amount) : 0;
 
         if (option != null)
-            game.ServerBroadcast($"Ruleta · {player.Name}: {option.resultText}");
+            game.ServerBroadcast(player, $"Ruleta: {option.resultText}", $"Ruleta · {option.OthersText(player.CharacterLabel)}");
 
         switch (effect)
         {

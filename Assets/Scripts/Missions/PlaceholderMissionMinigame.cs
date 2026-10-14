@@ -27,7 +27,7 @@ public class PlaceholderMissionMinigame : MissionMinigame
         string title = Definition != null ? Definition.title : "Misión";
         string description = Definition != null ? Definition.description : "";
 
-        TextMeshProUGUI header = UIFactory.CreateText(panel.transform, "Header", "MISIÓN DE " + CharacterName.ToUpper(), 26f);
+        TextMeshProUGUI header = UIFactory.CreateText(panel.transform, "Header", IsLocalPlayer ? "TU MISIÓN" : "MISIÓN DE " + CharacterName.ToUpper(), 26f);
         UIFactory.Place(header.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -30f), new Vector2(720f, 36f));
         header.color = UIFactory.AccentColor;
 
@@ -59,7 +59,9 @@ public class PlaceholderMissionMinigame : MissionMinigame
     public override void ShowResult(bool success)
     {
         if (resultText != null)
-            resultText.text = success ? "<color=#60FF60>¡MISIÓN COMPLETADA!</color>" : "<color=#FF5050>MISIÓN FALLIDA</color>";
+            resultText.text = IsLocalPlayer
+                ? (success ? "<color=#60FF60>¡COMPLETASTE TU MISIÓN!</color>" : "<color=#FF5050>FALLASTE TU MISIÓN</color>")
+                : (success ? $"<color=#60FF60>¡{PlayerName.ToUpper()} COMPLETÓ SU MISIÓN!</color>" : $"<color=#FF5050>{PlayerName.ToUpper()} FALLÓ SU MISIÓN</color>");
 
         if (completeButton != null) completeButton.interactable = false;
         if (failButton != null) failButton.interactable = false;

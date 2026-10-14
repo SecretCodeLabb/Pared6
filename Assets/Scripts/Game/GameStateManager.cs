@@ -20,7 +20,7 @@ public class GameStateManager : NetworkBehaviour
     [SerializeField] private EventManager eventManager;
 
     [Header("Network prefabs")]
-    [Tooltip("Assets/Prefabs/Player.prefab (NetworkObject + PlayerNetworkData + PlayerController).")]
+    [Tooltip("Assets/Prefabs/Players/Player.prefab (NetworkObject + PlayerNetworkData + PlayerController).")]
     [SerializeField] private GameObject networkPlayerPrefab;
 
     public NetworkVariable<int> BoardSeed = new NetworkVariable<int>(0);
@@ -366,6 +366,52 @@ public class GameStateManager : NetworkBehaviour
         MessageReceived?.Invoke(message);
     }
 
+    /// <summary>
+    /// Host only: the player the message is about reads <paramref name="toSubject"/> ("Pasaste el evento"),
+    /// everyone else reads <paramref name="toOthers"/> ("Chismosa pasó el evento").
+    /// </summary>
+    public void ServerBroadcast(PlayerNetworkData subject, string toSubject, string toOthers)
+    {
+        ServerBroadcast(subject, toSubject, null, null, toOthers);
+    }
+
+    /// <summary>Host only: like the overload above with two players involved (duels).</summary>
+    public void ServerBroadcast(PlayerNetworkData subject, string toSubject, PlayerNetworkData other, string toOther, string toOthers)
+    {
+        if (!IsServer)
+            return;
+
+        Debug.Log($"{NetworkConnectionManager.GetInstanceTag()} [Juego] {toOthers}");
+        ShowPerspectiveMessageRpc(
+            subject != null ? subject.PlayerId.Value : TurnRotation.NoPlayer, toSubject,
+            other != null ? other.PlayerId.Value : TurnRotation.NoPlayer, toOther ?? toOthers,
+            toOthers);
+    }
+
+    [Rpc(SendTo.ClientsAndHost)]
+    private void ShowPerspectiveMessageRpc(int subjectId, string toSubject, int otherId, string toOther, string toOthers)
+    {
+        string message = PickPerspective(subjectId, toSubject, otherId, toOther, toOthers);
+        // What this instance shows: lets the logs of each instance be checked (own turn vs spectator).
+        Debug.Log($"{NetworkConnectionManager.GetInstanceTag()} [Mensaje] {message}");
+        MessageReceived?.Invoke(message);
+    }
+
+    /// <summary>The text for the local player: the subject's, the other participant's or the spectators'.</summary>
+    public static string PickPerspective(int subjectId, string toSubject, int otherId, string toOther, string toOthers)
+    {
+        PlayerNetworkData local = PlayerNetworkData.Local;
+        int localId = local != null ? local.PlayerId.Value : TurnRotation.NoPlayer;
+
+        if (localId != TurnRotation.NoPlayer && localId == subjectId)
+            return toSubject;
+
+        if (localId != TurnRotation.NoPlayer && localId == otherId)
+            return toOther;
+
+        return toOthers;
+    }
+
     /// <summary>Host only: shows a message to one client (e.g. why a card could not be used).</summary>
     public void ServerMessageTo(ulong clientId, string message)
     {
@@ -449,12 +495,12 @@ public class GameStateManager : NetworkBehaviour
 
             player.ServerRemoveCardAt(reviveIndex);
             player.Lives.Value = lives;
-            ServerBroadcast($"¡{player.Name} revive con {card.displayName}! ({lives} vida)");
+            ServerBroadcast(player, $"¡Revives con {card.displayName}! ({lives} vida)", $"¡{player.CharacterLabel} revive con {card.displayName}! ({lives} vida)");
             return;
         }
 
         player.State.Value = PlayerLifeState.Eliminated;
-        ServerBroadcast($"{player.Name} ha sido ELIMINADO");
+        ServerBroadcast(player, "¡Has sido ELIMINADO!", $"{player.CharacterLabel} ha sido ELIMINADO");
         Debug.Log($"{NetworkConnectionManager.GetInstanceTag()} OnPlayerEliminated({player.PlayerId.Value})");
     }
 
@@ -478,7 +524,7 @@ public class GameStateManager : NetworkBehaviour
 
         player.State.Value = PlayerLifeState.Disconnected;
         player.ServerSetHand(new List<int>());
-        ServerBroadcast($"{player.Name} se ha desconectado");
+        ServerBroadcast($"{player.CharacterLabel} se ha desconectado");
 
         if (TurnManager.Instance.State.Value == TurnState.GameOver)
             return;

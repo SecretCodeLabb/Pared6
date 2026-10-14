@@ -377,7 +377,8 @@ public class PlayerNetworkData : NetworkBehaviour
         nameLabel.SetText(LabelText());
     }
 
-    private string CharacterLabel
+    /// <summary>Name used in game messages: the chosen character (e.g. "Chismosa"), or the player name.</summary>
+    public string CharacterLabel
     {
         get
         {

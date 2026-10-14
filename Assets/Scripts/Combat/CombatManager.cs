@@ -32,7 +32,11 @@ public class CombatManager : NetworkBehaviour
     public NetworkVariable<int> CardsUsed = new NetworkVariable<int>(0);
     public NetworkVariable<bool> LifeProtected = new NetworkVariable<bool>(false);
     public NetworkVariable<int> LifeLoss = new NetworkVariable<int>(0);
+    /// <summary>Last card note as the other players read it ("Chismosa usó Canicas").</summary>
     public NetworkVariable<FixedString128Bytes> LastCardText = new NetworkVariable<FixedString128Bytes>();
+    /// <summary>Same note for the player who played it ("Usaste Canicas").</summary>
+    public NetworkVariable<FixedString128Bytes> LastCardSelfText = new NetworkVariable<FixedString128Bytes>();
+    public NetworkVariable<int> LastCardPlayerId = new NetworkVariable<int>(TurnRotation.NoPlayer);
 
     // Duel only (defender side).
     public NetworkVariable<bool> IsDuel = new NetworkVariable<bool>(false);
@@ -147,7 +151,11 @@ public class CombatManager : NetworkBehaviour
         bool canUseCards = Rules.maxCardsPerCombat > 0 && player.Hand.Count > 0 && !player.CardsBlocked;
         Phase.Value = canUseCards ? CombatPhase.CardPhase : CombatPhase.Rolling;
 
-        AnnounceRpc((forced ? "¡PELEA OBLIGATORIA!" : "¡EVENTO!") + "\n<size=70%>¡TE HAS ENCONTRADO CON UNA AMENAZA!</size>\n<size=55%>" + player.Name + "</size>");
+        string header = forced ? "¡PELEA OBLIGATORIA!" : "¡EVENTO!";
+        AnnounceRpc(
+            player.PlayerId.Value, header + "\n<size=70%>¡TE HAS ENCONTRADO CON UNA AMENAZA!</size>",
+            TurnRotation.NoPlayer, null,
+            header + $"\n<size=70%>¡{player.CharacterLabel.ToUpper()} SE HA ENCONTRADO CON UNA AMENAZA!</size>");
         Debug.Log($"{NetworkConnectionManager.GetInstanceTag()} ¡EVENTO! {player.Name} combate en {cell} (requerido {context.Required})");
     }
 
@@ -167,8 +175,16 @@ public class CombatManager : NetworkBehaviour
         // Cards (if any) can be played until each side rolls.
         Phase.Value = CombatPhase.CardPhase;
 
-        AnnounceRpc("¡DUELO!\n<size=70%>" + attacker.Name + " contra " + defender.Name + "</size>");
-        GameStateManager.Instance.ServerBroadcast($"¡DUELO! {attacker.Name} contra {defender.Name}");
+        string attackerName = attacker.CharacterLabel;
+        string defenderName = defender.CharacterLabel;
+        AnnounceRpc(
+            attacker.PlayerId.Value, $"¡DUELO!\n<size=70%>Retas a {defenderName}</size>",
+            defender.PlayerId.Value, $"¡DUELO!\n<size=70%>¡{attackerName} te reta!</size>",
+            $"¡DUELO!\n<size=70%>{attackerName} contra {defenderName}</size>");
+        GameStateManager.Instance.ServerBroadcast(
+            attacker, $"¡Duelo contra {defenderName}!",
+            defender, $"¡{attackerName} te reta a un duelo!",
+            $"¡DUELO! {attackerName} contra {defenderName}");
         Debug.Log($"{NetworkConnectionManager.GetInstanceTag()} ¡DUELO! {attacker.Name} vs {defender.Name}");
     }
 
@@ -182,7 +198,7 @@ public class CombatManager : NetworkBehaviour
         IsDuel.Value = duel;
         CombatPlayerId.Value = attacker.PlayerId.Value;
         DefenderPlayerId.Value = TurnRotation.NoPlayer;
-        LastCardText.Value = "";
+        SetLastCard(null, "", "");
         LifeLoss.Value = 0;
         DefenderLifeLoss.Value = 0;
         SyncContext();
@@ -201,11 +217,30 @@ public class CombatManager : NetworkBehaviour
         Phase.Value = CombatPhase.None;
     }
 
+    /// <summary>Big announcement: the subject, the other duelist and the spectators each read their own text.</summary>
     [Rpc(SendTo.ClientsAndHost)]
-    private void AnnounceRpc(string text)
+    private void AnnounceRpc(int subjectId, string toSubject, int otherId, string toOther, string toOthers)
     {
+        string text = GameStateManager.PickPerspective(subjectId, toSubject, otherId, toOther ?? toOthers, toOthers);
+        Debug.Log($"{NetworkConnectionManager.GetInstanceTag()} [Anuncio] {text.Replace('\n', ' ')}");
+
         if (EventUI.Instance != null)
             EventUI.Instance.ShowMessage(text, 2.5f);
+    }
+
+    private void SetLastCard(PlayerNetworkData player, string toPlayer, string toOthers)
+    {
+        LastCardPlayerId.Value = player != null ? player.PlayerId.Value : TurnRotation.NoPlayer;
+        LastCardSelfText.Value = toPlayer;
+        LastCardText.Value = toOthers;
+    }
+
+    /// <summary>The last card note as the local player reads it ("Usaste X" / "Chismosa usó X").</summary>
+    public string LocalLastCardText()
+    {
+        PlayerNetworkData local = PlayerNetworkData.Local;
+        bool mine = local != null && local.PlayerId.Value == LastCardPlayerId.Value;
+        return (mine ? LastCardSelfText.Value : LastCardText.Value).ToString();
     }
 
     // =========================================================
@@ -291,9 +326,9 @@ public class CombatManager : NetworkBehaviour
         sideContext.CardsUsed++;
         sideContext.AppliedCards.Add(card.displayName);
 
-        LastCardText.Value = $"{player.Name} usó {card.displayName}";
+        SetLastCard(player, $"Usaste {card.displayName}", $"{player.CharacterLabel} usó {card.displayName}");
         SyncContext();
-        GameStateManager.Instance.ServerBroadcast($"{player.Name} usó {card.displayName}");
+        GameStateManager.Instance.ServerBroadcast(player, $"Usaste {card.displayName}", $"{player.CharacterLabel} usó {card.displayName}");
 
         if (!IsDuel.Value && context.CardsUsed >= Rules.maxCardsPerCombat)
             Phase.Value = CombatPhase.Rolling;
@@ -314,9 +349,9 @@ public class CombatManager : NetworkBehaviour
         if (escaped)
         {
             string what = IsDuel.Value ? "del duelo" : "de la entidad";
-            LastCardText.Value = $"¡{player.Name} escapó {what} con {card.displayName}!";
+            SetLastCard(player, $"¡Escapaste {what} con {card.displayName}!", $"¡{player.CharacterLabel} escapó {what} con {card.displayName}!");
             SyncContext();
-            GameStateManager.Instance.ServerBroadcast($"¡{player.Name} escapó {what}! ({card.displayName})");
+            GameStateManager.Instance.ServerBroadcast(player, $"¡Escapaste {what}! ({card.displayName})", $"¡{player.CharacterLabel} escapó {what}! ({card.displayName})");
 
             // No damage, no progress; an event tile keeps its event.
             LifeLoss.Value = 0;
@@ -326,9 +361,9 @@ public class CombatManager : NetworkBehaviour
             return;
         }
 
-        LastCardText.Value = $"{player.Name} usó {card.displayName}... ¡pero no logró escapar!";
+        SetLastCard(player, $"Usaste {card.displayName}... ¡pero no lograste escapar!", $"{player.CharacterLabel} usó {card.displayName}... ¡pero no logró escapar!");
         SyncContext();
-        GameStateManager.Instance.ServerBroadcast($"{player.Name} no logró escapar ({card.displayName})");
+        GameStateManager.Instance.ServerBroadcast(player, $"No lograste escapar ({card.displayName})", $"{player.CharacterLabel} no logró escapar ({card.displayName})");
 
         if (!IsDuel.Value && context.CardsUsed >= Rules.maxCardsPerCombat)
             Phase.Value = CombatPhase.Rolling;
@@ -343,7 +378,7 @@ public class CombatManager : NetworkBehaviour
         if (IsDuel.Value || side != Side.Attacker || Phase.Value != CombatPhase.CardPhase)
             return;
 
-        LastCardText.Value = $"{player.Name} no usa carta";
+        SetLastCard(player, "No usas carta", $"{player.CharacterLabel} no usa carta");
         Phase.Value = CombatPhase.Rolling;
     }
 

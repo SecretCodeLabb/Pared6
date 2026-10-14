@@ -20,7 +20,7 @@ public class RouletteOption
     [Tooltip("Text on the wheel segment (short; use \\n for two lines).")]
     public string label = "NADA";
 
-    [Tooltip("Text shown when this option wins.")]
+    [Tooltip("Text shown to the player who spun when this option wins (second person: \"Pierdes tu próximo turno\").")]
     public string resultText = "No pasa nada";
 
     public Color color = Color.gray;
@@ -31,6 +31,24 @@ public class RouletteOption
     public RouletteEffectType effect = RouletteEffectType.Nothing;
 
     [Min(0)] public int amount = 1;
+
+    /// <summary>The result as the other players read it ("Chismosa pierde su próximo turno").</summary>
+    public string OthersText(string playerName)
+    {
+        string moves = amount == 1 ? "movimiento" : "movimientos";
+
+        switch (effect)
+        {
+            case RouletteEffectType.ExtraMoves: return $"¡{playerName} gana +{amount} {moves} ahora!";
+            case RouletteEffectType.LessMovesNextRoll: return $"{playerName}: -{amount} en su próxima tirada";
+            case RouletteEffectType.LoseTurn: return amount == 1 ? $"{playerName} pierde su próximo turno" : $"{playerName} pierde sus próximos {amount} turnos";
+            case RouletteEffectType.NoCardsNextTurn: return $"{playerName} no puede usar cartas la siguiente ronda";
+            case RouletteEffectType.DamagePenalty: return $"{playerName}: -{amount} de daño la siguiente ronda";
+            case RouletteEffectType.LoseLife: return amount == 1 ? $"¡{playerName} pierde una vida!" : $"¡{playerName} pierde {amount} vidas!";
+            case RouletteEffectType.ForcedFight: return $"¡Una entidad ataca a {playerName}!";
+            default: return $"A {playerName} no le pasa nada";
+        }
+    }
 }
 
 /// <summary>
