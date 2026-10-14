@@ -210,6 +210,54 @@ Efectos incluidos: `AddToRoll(n)`, `ReduceRequired(n)`, `ReduceDamage(n)`, `Prev
 Mazo por defecto (tipos del usuario): Golpe +1/+2/+3 (Daño), Escudo −1/−2/−3 (Defensa),
 Truco del oficio (Habilidad, sin efecto aún), Piedra brillante (Inútil).
 
+## Efectos visuales y HUD
+
+- **Dado animado:** al pulsar TIRAR DADO el Host decide la tirada al instante, pero todos ven un dado
+  rodando en el centro de la pantalla durante `GameRules.diceAnimationSeconds` (1,3 s; 0 = sin animación)
+  y solo después se abre el movimiento. `TurnManager.RollCount` / `DiceRolling` sincronizan la animación.
+- **Efectos en el tablero** (`Scripts/Fx/GameFx`, solo visual y local en cada instancia):
+  - Movimiento: salto por casilla con polvo al caer.
+  - Turno: anillo del color del personaje bajo la ficha activa y número de pasos restantes encima.
+  - Peligro: anillo rojo bajo un rival a 2 casillas o menos.
+  - Duelo: chispas entre las fichas y temblor de cámara.
+  - Evento: explosión morada y temblor de cámara; superado = chispas verdes, huida = azul.
+  - Vidas: textos flotantes «-1 ♥» / «+1 ♥»; eliminación con nube gris.
+  - Misión: destello dorado al empezar y confeti al completarla y al ganar.
+- **Ambiente Backrooms (laberinto central):** `Board/BackroomsAmbience` en el objeto `MapGenerator` de Mapa.
+  Tubos fluorescentes y halos de luz falsos, sin luces en tiempo real (una malla por material, 2 llamadas
+  de dibujo). El parpadeo cambia colores de vértices y, de vez en cuando, baja un instante la luz principal.
+  Usa luz cálida y fondo oscuro sin skybox, y muestra polvo flotante solo en equipos capaces.
+  `quality = Auto` reduce las luces y quita el polvo en móviles con poca memoria o CPU.
+  Se desactiva quitando el componente.
+- **Arte de efectos:** `Art/Fx/` (texturas + materiales) y `Resources/FxConfig.asset`. Se regeneran con
+  **PPOP → Fx → Build Fx Assets** (los PNG existentes no se pisan, así que se pueden reemplazar).
+- **HUD:**
+  - Banner corto («¡TU TURNO!» / «● TURNO DE X» con el color del personaje).
+  - Contador grande de pasos, y flechas de movimiento solo mientras se puede mover.
+  - Botón de carta especial solo si tienes una utilizable.
+  - El botón que espera tu acción palpita.
+  - Lista de jugadores compacta.
+  - Combate con el objetivo y las tiradas en números grandes, abajo a la derecha para no tapar la ficha.
+
+## Estructura de carpetas (Assets)
+
+- `Art/`: modelos, texturas y materiales.
+  - `Board/Nivel0/`: casilla del laberinto central (`nivel 0.fbx` + texturas).
+  - `Rooms/`: modelos de las habitaciones laterales.
+  - `Minigames/<Personaje>/`: PNG reemplazables de cada minijuego.
+  - `Characters/Cards/`: arte de las cartas de personaje.
+  - `Materials/`, `UI/`.
+- `Prefabs/`: `Board/` (casillas, indicador de evento), `Rooms/` (habitaciones), `Players/`, `Minigames/`, `UI/`, `Network/`.
+- `ScriptableObjects/`: `Characters/`, `Missions/`, `Cards/`.
+- `Resources/`: assets que se cargan por nombre en tiempo de ejecución (`GameRules`, `RouletteConfig`, `CharacterCatalog`, cartas). No mover.
+- `Scripts/`: `Board/` (generación del tablero), `Game/` (turnos, reglas en `Game/Rules`), `Players/`, `Missions/` (+ `Minigames/`), `Combat/`, `Cards/`, `Events/`, `Lobby/`, `Network/`, `UI/`, `Editor/` (menús PPOP).
+- `Scenes/`, `Settings/` (URP), `Tests/`.
+
+**Casilla del laberinto central:** `MapGenerator.centralTilePrefab` (escena `Mapa`) = `Prefabs/Board/Tile_Nivel0`,
+generado desde `Art/Board/Nivel0/nivel 0.fbx` con **PPOP → Board → Build Central Tile (Nivel 0)** (una celda de
+2×2: suelo + 4 muros que se encienden según el laberinto). Las habitaciones laterales siguen usando `tilePrefab`
+como casilla lógica invisible.
+
 ## Arquitectura (resumen)
 
 - `Scripts/Game/Rules/` (ensamblado `Pared.Rules`, sin red, testeable): `GameRules`, `TurnRotation`,
@@ -219,7 +267,7 @@ Truco del oficio (Habilidad, sin efecto aún), Piedra brillante (Inútil).
 - `Scripts/Game/GameStateManager` (objeto `GameNetwork` en `Mapa`): semilla, eventos, barrera de carga, spawn, victoria, desconexiones.
 - `Scripts/Game/TurnManager`: máquina de estados, dado y movimiento validados en el Host.
 - `Scripts/Combat/CombatManager`, `Scripts/Cards/CardManager`.
-- `Scripts/Players/PlayerNetworkData`: fuente única de verdad por jugador (en `Prefabs/Player.prefab`).
+- `Scripts/Players/PlayerNetworkData`: fuente única de verdad por jugador (en `Prefabs/Players/Player.prefab`).
 - `Scripts/UI/GameHUD`: HUD de red (se desactiva en modo offline).
 - `PPOP/Setup Prototype` (Editor): recrea assets, prefabs y referencias de escena. `PPOP/Create Example Cards`.
 

@@ -36,7 +36,7 @@ Eres un desarrollador técnico senior de Unity 6 / C# que trabaja directamente s
 - No reconstruyas el tablero, no cambies el tamaño del mapa, no toques el sistema de paredes salvo imprescindible.
 - No reemplaces scripts que funcionan: **amplíalos**. Antes de modificar uno, indica en una línea qué cambias y por qué; conserva su comportamiento actual.
 - No crees sistemas paralelos si ya existe uno equivalente (dados, turnos, eventos, puntos/misiones, UI).
-- Estructura: `Scripts/{Network,Lobby,Players,Game,Combat,Cards,Events,UI}`, `Prefabs/{Players,Cards,Events,UI}`, `ScriptableObjects/Cards`, `Editor/`.
+- Estructura: `Scripts/{Board,Network,Lobby,Players,Game,Missions,Combat,Cards,Events,UI,Editor}`, `Prefabs/{Board,Rooms,Players,Minigames,UI,Network}`, `ScriptableObjects/{Characters,Missions,Cards}`, `Art/` (modelos, texturas, materiales). Detalle en README_PROTOTIPO.
 - Mantén un **modo offline/fallback** (una sola instancia sin red) mientras sea razonable, para poder probar sin ParrelSync.
 
 ## 5. Arquitectura (decisiones fijas)
