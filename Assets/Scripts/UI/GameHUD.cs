@@ -14,7 +14,7 @@ using UnityEngine.UI;
 public class GameHUD : MonoBehaviour
 {
     private const float RefreshInterval = 0.1f;
-    private const float ToastSeconds = 4f;
+    private const float ToastSeconds = 3.5f;
     private const string Heart = "♥";
 
     // Tablets / monitors use DesignResolution; phones scale the UI up to PhoneHeight
@@ -40,6 +40,10 @@ public class GameHUD : MonoBehaviour
     private TextMeshProUGUI livesText;
     private TextMeshProUGUI playersText;
     private TextMeshProUGUI objectiveText;
+    private Image turnBanner;
+    private TextMeshProUGUI movesLabel;
+    private DiceRollView diceView;
+    private int shownRollCount = -1;
 
     private MissionMinigame missionMinigame;
     private int missionShownFor = -1;
@@ -57,6 +61,8 @@ public class GameHUD : MonoBehaviour
     private TextMeshProUGUI handTitle;
     private readonly List<int> shownHand = new List<int>();
     private readonly List<GameObject> handCardGlows = new List<GameObject>();
+    private readonly List<HandCard> handCards = new List<HandCard>();
+    private bool handRaised;
     private int selectedHandIndex = -1;
 
     private GameObject combatPanel;
@@ -105,6 +111,9 @@ public class GameHUD : MonoBehaviour
 
     private void Update()
     {
+        PulseButtons();
+        LayoutHand();
+
         if (Time.unscaledTime < nextRefresh)
             return;
 
@@ -155,7 +164,12 @@ public class GameHUD : MonoBehaviour
 
         BuildRoulette(overlays);
         AdoptEventAnnouncement(overlays);
+        diceView = DiceRollView.Create(overlays);
         BuildEndPanel(overlays);
+
+        // Board effects (steps, turn marker, fights, lives, missions). Local and purely visual.
+        if (GetComponent<GameFx>() == null)
+            gameObject.AddComponent<GameFx>();
     }
 
     /// <summary>
@@ -173,7 +187,7 @@ public class GameHUD : MonoBehaviour
         panel.SetParent(overlays, false);
         panel.localScale = Vector3.one;
         panel.localRotation = Quaternion.identity;
-        UIFactory.Place(panel, new Vector2(0.5f, 0.5f), new Vector2(0f, 80f), new Vector2(720f, 150f));
+        UIFactory.Place(panel, new Vector2(0.5f, 1f), new Vector2(0f, -178f), new Vector2(680f, 130f));
         panel.pivot = new Vector2(0.5f, 0.5f);
         panel.gameObject.AddComponent<ScaleToFit>();
 
@@ -216,6 +230,9 @@ public class GameHUD : MonoBehaviour
             dice.SetParent(root, false);
             dice.localScale = Vector3.one;
             UIFactory.Place(dice, new Vector2(0f, 1f), new Vector2(16f, -80f), new Vector2(90f, 90f));
+
+            // Duplicate of the TIRAR DADO button (offline UI); the HUD button and the dice animation replace it.
+            dice.gameObject.SetActive(false);
         }
 
         if (gameInfoText != null)
@@ -226,25 +243,29 @@ public class GameHUD : MonoBehaviour
             UIFactory.Place(info, new Vector2(0f, 1f), new Vector2(116f, -88f), new Vector2(200f, 70f));
             gameInfoText.fontSize = 18f;
             gameInfoText.alignment = TextAlignmentOptions.TopLeft;
+            gameInfoText.gameObject.SetActive(false);
         }
     }
 
     private void BuildTurnBanner(Transform root)
     {
-        Image banner = UIFactory.CreatePanel(root, "TurnBanner", UIFactory.PanelColor);
-        UIFactory.Place(banner.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -8f), new Vector2(560f, 112f));
+        turnBanner = UIFactory.CreatePanel(root, "TurnBanner", UIFactory.PanelColor);
+        UseRounded(turnBanner);
+        UIFactory.Place(turnBanner.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -8f), new Vector2(560f, 92f));
 
-        turnText = UIFactory.CreateText(banner.transform, "TurnText", "", 28f);
-        UIFactory.Place(turnText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -4f), new Vector2(540f, 40f));
-        AutoSize(turnText, 18f);
+        turnText = UIFactory.CreateText(turnBanner.transform, "TurnText", "", 34f);
+        UIFactory.Place(turnText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -4f), new Vector2(540f, 46f));
+        turnText.fontStyle = FontStyles.Bold;
+        AutoSize(turnText, 20f);
 
-        localTurnText = UIFactory.CreateText(banner.transform, "LocalTurnText", "", 24f);
-        UIFactory.Place(localTurnText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -44f), new Vector2(540f, 34f));
+        hintText = UIFactory.CreateText(turnBanner.transform, "HintText", "", 20f);
+        UIFactory.Place(hintText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -52f), new Vector2(540f, 32f));
+        hintText.color = new Color(0.9f, 0.9f, 0.9f);
+        AutoSize(hintText, 13f);
 
-        hintText = UIFactory.CreateText(banner.transform, "HintText", "", 17f);
-        UIFactory.Place(hintText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -78f), new Vector2(540f, 30f));
-        hintText.color = new Color(0.85f, 0.85f, 0.85f);
-        AutoSize(hintText, 12f);
+        // Same place as the hint: replaces it when the local player is eliminated.
+        localTurnText = UIFactory.CreateText(turnBanner.transform, "LocalTurnText", "", 20f);
+        UIFactory.Place(localTurnText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -52f), new Vector2(540f, 32f));
     }
 
     private void BuildPlayersPanel(Transform root)
@@ -252,6 +273,7 @@ public class GameHUD : MonoBehaviour
         Image panel = UIFactory.CreatePanel(root, "PlayersPanel", UIFactory.PanelColor);
         UIFactory.Place(panel.rectTransform, new Vector2(1f, 1f), new Vector2(-12f, -12f), new Vector2(330f, 380f));
 
+        UseRounded(panel);
         TextMeshProUGUI title = UIFactory.CreateText(panel.transform, "Title", "JUGADORES", 22f);
         UIFactory.Place(title.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -6f), new Vector2(310f, 30f));
         title.color = UIFactory.AccentColor;
@@ -270,6 +292,7 @@ public class GameHUD : MonoBehaviour
     private void BuildActionsPanel(Transform root)
     {
         Image panel = UIFactory.CreatePanel(root, "ActionsPanel", UIFactory.PanelColor);
+        UseRounded(panel);
         UIFactory.Place(panel.rectTransform, new Vector2(0f, 0f), new Vector2(12f, 12f), new Vector2(300f, 414f));
 
         livesText = UIFactory.CreateText(panel.transform, "LivesText", "", 26f);
@@ -282,9 +305,10 @@ public class GameHUD : MonoBehaviour
         turnCardButton = UIFactory.CreateButton(panel.transform, "TurnCardButton", "USAR CARTA ESPECIAL", OnTurnCardClicked, new Color(0.45f, 0.18f, 0.70f), 18f);
         UIFactory.Place((RectTransform)turnCardButton.transform, new Vector2(0.5f, 1f), new Vector2(0f, -110f), new Vector2(280f, 50f));
 
-        string moveHint = ResponsiveCanvas.IsTouchDevice ? "MOVER" : "MOVER (WASD / flechas)";
-        TextMeshProUGUI moveLabel = UIFactory.CreateText(panel.transform, "MoveLabel", moveHint, 15f);
-        UIFactory.Place(moveLabel.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -164f), new Vector2(280f, 22f));
+        // Steps left while moving ("3 PASOS"); the arrows only show when they can be used.
+        movesLabel = UIFactory.CreateText(panel.transform, "MoveLabel", "", 24f);
+        UIFactory.Place(movesLabel.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -160f), new Vector2(280f, 30f));
+        movesLabel.fontStyle = FontStyles.Bold;
 
         // Big touch-friendly pad.
         AddMoveButton(panel.transform, "↑", Vector2Int.up, new Vector2(0f, -190f));
@@ -304,56 +328,112 @@ public class GameHUD : MonoBehaviour
     private const float HandCardHeight = HandCardWidth / CardLayout.Aspect;
     private const float HandPanelHeight = HandCardHeight + 40f;
 
+    // Fan of cards (card-game style): overlapping and tilted along an arc; the open one grows.
+    private const float HandFanWidth = 560f;
+    private const float HandRaisedY = 18f;
+    private const float HandLoweredY = -78f;
+    private const float HandOpenLift = 125f;
+    private const float HandOpenScale = 1.45f;
+
     private void BuildHandPanel(Transform root)
     {
-        Image panel = UIFactory.CreatePanel(root, "HandPanel", UIFactory.PanelColor);
-        UIFactory.Place(panel.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, 12f), new Vector2(500f, HandPanelHeight));
+        // No background: the cards themselves are the hand, like in a card game.
+        RectTransform panel = UIFactory.CreateRect(root, "HandPanel");
+        UIFactory.Place(panel, new Vector2(0.5f, 0f), new Vector2(0f, 0f), new Vector2(HandFanWidth + 200f, HandPanelHeight));
         handPanel = panel.gameObject;
 
-        handTitle = UIFactory.CreateText(panel.transform, "Title", "MIS CARTAS", 18f);
-        UIFactory.Place(handTitle.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -3f), new Vector2(480f, 26f));
+        handTitle = UIFactory.CreateText(panel, "Title", "MIS CARTAS", 18f);
+        UIFactory.Place(handTitle.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, HandRaisedY + HandCardHeight + 6f), new Vector2(560f, 26f));
         handTitle.color = UIFactory.AccentColor;
+        handTitle.outlineWidth = 0.2f;
+        handTitle.outlineColor = Color.black;
         AutoSize(handTitle, 12f);
 
-        RectTransform container = UIFactory.CreateRect(panel.transform, "Cards");
-        UIFactory.Place(container, new Vector2(0.5f, 0f), new Vector2(0f, 8f), new Vector2(480f, HandCardHeight + 4f));
-        HorizontalLayoutGroup layout = container.gameObject.AddComponent<HorizontalLayoutGroup>();
-        layout.spacing = 12f;
-        layout.childAlignment = TextAnchor.MiddleCenter;
-        layout.childControlWidth = false;
-        layout.childControlHeight = false;
-        layout.childForceExpandWidth = false;
+        RectTransform container = UIFactory.CreateRect(panel, "Cards");
+        UIFactory.Place(container, new Vector2(0.5f, 0f), Vector2.zero, new Vector2(HandFanWidth, HandCardHeight));
         handContainer = container;
+    }
+
+    /// <summary>Opens (selects) a card of the hand, or closes it with -1 (same as clicking it).</summary>
+    public void SelectHandCard(int index)
+    {
+        selectedHandIndex = index >= 0 && index < handCards.Count ? index : -1;
+    }
+
+    /// <summary>
+    /// Fan slots every frame: raised on your turn (or when you can play a card in a fight), half
+    /// hidden at the bottom otherwise; the open card (= selected) grows and rises above the others.
+    /// </summary>
+    private void LayoutHand()
+    {
+        int n = handCards.Count;
+
+        if (n == 0)
+            return;
+
+        float spacing = n > 1 ? Mathf.Min(HandCardWidth * 0.8f, (HandFanWidth - HandCardWidth) / (n - 1)) : 0f;
+        float middle = (n - 1) * 0.5f;
+        float baseY = handRaised ? HandRaisedY : HandLoweredY;
+        HandCard openCard = null;
+
+        for (int i = 0; i < n; i++)
+        {
+            HandCard card = handCards[i];
+
+            if (card == null)
+                continue;
+
+            float offset = i - middle;
+            bool open = i == selectedHandIndex;
+            card.Open = open;
+
+            if (open)
+            {
+                card.SetTarget(new Vector2(offset * spacing * 0.6f, baseY + HandOpenLift - (handRaised ? 0f : HandLoweredY - HandRaisedY)), 0f, HandOpenScale);
+                openCard = card;
+                continue;
+            }
+
+            float lift = card.Hovered ? 22f : 0f;
+            card.SetTarget(new Vector2(offset * spacing, baseY - offset * offset * 5f + lift), -offset * 5f, card.Hovered ? 1.06f : 1f);
+            card.transform.SetSiblingIndex(i);
+        }
+
+        // The open card is drawn above the rest.
+        if (openCard != null)
+            openCard.transform.SetAsLastSibling();
     }
 
     private void BuildCombatPanel(Transform root)
     {
-        // Above the hand so the cards stay visible and selectable during the fight.
+        // Bottom-right, under the players list: the board centre (the fighting pawns and their
+        // effects) stays visible, and the hand stays free to pick cards.
         Image panel = UIFactory.CreatePanel(root, "CombatPanel", new Color(0.12f, 0.05f, 0.05f, 0.94f));
-        UIFactory.Place(panel.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, HandPanelHeight + 20f), new Vector2(600f, 326f));
+        UseRounded(panel);
+        UIFactory.Place(panel.rectTransform, new Vector2(1f, 0f), new Vector2(-12f, 12f), new Vector2(440f, 310f));
         combatPanel = panel.gameObject;
 
         combatTitle = UIFactory.CreateText(panel.transform, "Title", "", 24f);
-        UIFactory.Place(combatTitle.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -8f), new Vector2(580f, 36f));
+        UIFactory.Place(combatTitle.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -8f), new Vector2(420f, 36f));
         combatTitle.color = new Color(1f, 0.45f, 0.35f);
         AutoSize(combatTitle, 16f);
 
-        combatBody = UIFactory.CreateText(panel.transform, "Body", "", 18f);
-        UIFactory.Place(combatBody.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -46f), new Vector2(580f, 150f));
+        combatBody = UIFactory.CreateText(panel.transform, "Body", "", 20f);
+        UIFactory.Place(combatBody.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -44f), new Vector2(420f, 140f));
         AutoSize(combatBody, 12f);
 
         combatResult = UIFactory.CreateText(panel.transform, "Result", "", 30f);
-        UIFactory.Place(combatResult.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -198f), new Vector2(580f, 46f));
+        UIFactory.Place(combatResult.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -186f), new Vector2(420f, 44f));
         AutoSize(combatResult, 16f);
 
         useCardButton = UIFactory.CreateButton(panel.transform, "UseCardButton", "USAR CARTA", OnUseCardClicked, UIFactory.OkColor, 18f);
-        UIFactory.Place((RectTransform)useCardButton.transform, new Vector2(0.5f, 0f), new Vector2(-195f, 14f), new Vector2(180f, 62f));
+        UIFactory.Place((RectTransform)useCardButton.transform, new Vector2(0.5f, 0f), new Vector2(-142f, 12f), new Vector2(132f, 62f));
 
-        skipCardButton = UIFactory.CreateButton(panel.transform, "SkipCardButton", "NO USAR CARTA", OnSkipCardClicked, UIFactory.ButtonColor, 18f);
-        UIFactory.Place((RectTransform)skipCardButton.transform, new Vector2(0.5f, 0f), new Vector2(0f, 14f), new Vector2(180f, 62f));
+        skipCardButton = UIFactory.CreateButton(panel.transform, "SkipCardButton", "SIN CARTA", OnSkipCardClicked, UIFactory.ButtonColor, 18f);
+        UIFactory.Place((RectTransform)skipCardButton.transform, new Vector2(0.5f, 0f), new Vector2(0f, 12f), new Vector2(132f, 62f));
 
         combatRollButton = UIFactory.CreateButton(panel.transform, "CombatRollButton", "TIRAR DADO", OnCombatRollClicked, UIFactory.DangerColor, 18f);
-        UIFactory.Place((RectTransform)combatRollButton.transform, new Vector2(0.5f, 0f), new Vector2(195f, 14f), new Vector2(180f, 62f));
+        UIFactory.Place((RectTransform)combatRollButton.transform, new Vector2(0.5f, 0f), new Vector2(142f, 12f), new Vector2(132f, 62f));
     }
 
     private void BuildEndPanel(Transform root)
@@ -381,6 +461,18 @@ public class GameHUD : MonoBehaviour
         UIFactory.Place((RectTransform)menuButton.transform, new Vector2(0.5f, 0f), new Vector2(160f, 26f), new Vector2(290f, 78f));
 
         endPanel.SetActive(false);
+    }
+
+    /// <summary>Rounded corners (FxConfig.roundedSquare, 9-sliced) when available.</summary>
+    private static void UseRounded(Image image)
+    {
+        FxConfig config = FxConfig.Instance;
+
+        if (config == null || config.roundedSquare == null)
+            return;
+
+        image.sprite = config.roundedSquare;
+        image.type = Image.Type.Sliced;
     }
 
     /// <summary>Shrinks long texts instead of overflowing on small screens.</summary>
@@ -416,6 +508,7 @@ public class GameHUD : MonoBehaviour
             return;
         }
 
+        RefreshDice(turns);
         RefreshTurn(turns, local);
         RefreshPlayers(turns);
         RefreshLocal(turns, local);
@@ -434,60 +527,108 @@ public class GameHUD : MonoBehaviour
             networkText.text = (ResponsiveCanvas.IsTouchDevice ? "Pellizca: zoom     " : "Rueda: zoom · C: vista general     ") + (nm.IsHost ? "HOST" : "CLIENTE") + " · " + PlayerNetworkData.All.Count + " jugadores · Seed " + game.BoardSeed.Value;
     }
 
+    /// <summary>Plays the dice animation once per roll (TurnManager.RollCount).</summary>
+    private void RefreshDice(TurnManager turns)
+    {
+        int count = turns.RollCount.Value;
+
+        // Joining mid-game (or the first refresh) must not replay an old roll.
+        if (shownRollCount < 0 || diceView == null)
+        {
+            shownRollCount = count;
+            return;
+        }
+
+        if (count == shownRollCount)
+            return;
+
+        shownRollCount = count;
+        PlayerNetworkData current = turns.CurrentPlayer;
+        int roll = turns.LastRoll.Value;
+        string label = turns.IsLocalPlayersTurn ? $"¡{roll}!" : $"{(current != null ? current.CharacterLabel : "?")}: {roll}";
+        diceView.Play(roll, Rules.diceAnimationSeconds, CharacterColor(current), label);
+    }
+
     private void RefreshTurn(TurnManager turns, PlayerNetworkData local)
     {
         PlayerNetworkData current = turns.CurrentPlayer;
-        string currentName = current != null ? $"{current.Name} ({CharacterName(current)})" : "-";
+        string who = current != null ? current.CharacterLabel : "-";
+        bool mine = turns.IsLocalPlayersTurn;
+        Color whoColor = CharacterColor(current);
+        string dot = $"<color=#{ColorUtility.ToHtmlStringRGB(whoColor)}>●</color> ";
 
-        turnText.text = "TURNO DE: " + currentName;
-
-        if (local == null || turns.State.Value == TurnState.GameOver)
-        {
-            localTurnText.text = "";
-        }
-        else if (!local.IsAlive)
-        {
-            localTurnText.text = local.State.Value == PlayerLifeState.Eliminated ? "<color=#FF5050>ESTÁS ELIMINADO</color>" : "";
-        }
-        else if (turns.IsLocalPlayersTurn)
-        {
-            localTurnText.text = "<color=#FFD040>ES TU TURNO</color>";
-        }
+        // Big and short: "¡TU TURNO!" for the active player, the character (with its colour) for the rest.
+        if (turns.State.Value == TurnState.GameOver)
+            turnText.text = "PARTIDA TERMINADA";
         else
+            turnText.text = mine ? "<color=#FFD040>¡TU TURNO!</color>" : dot + "TURNO DE " + who.ToUpper();
+
+        // The banner glows with the colour of whoever is playing (pulses on your turn).
+        Color panel = UIFactory.PanelColor;
+
+        if (turns.State.Value != TurnState.GameOver && current != null)
         {
-            localTurnText.text = "<color=#AAAAAA>ESPERANDO TURNO...</color>";
+            float glow = mine ? 0.35f + Mathf.Sin(Time.unscaledTime * 5f) * 0.12f : 0.22f;
+            panel = Color.Lerp(UIFactory.PanelColor, whoColor * 0.6f, glow);
+            panel.a = UIFactory.PanelColor.a;
         }
+
+        turnBanner.color = panel;
+
+        bool eliminated = local != null && local.State.Value == PlayerLifeState.Eliminated && turns.State.Value != TurnState.GameOver;
+        localTurnText.text = eliminated ? "<color=#FF5050>ESTÁS ELIMINADO · solo miras</color>" : "";
 
         string hint;
+        CombatManager combat = CombatManager.Instance;
 
         switch (turns.State.Value)
         {
-            case TurnState.WaitingForRoll: hint = turns.IsLocalPlayersTurn ? "Pulsa TIRAR DADO" : "Esperando la tirada"; break;
+            case TurnState.WaitingForRoll:
+                if (turns.DiceRolling.Value) hint = "Tirando el dado...";
+                else hint = mine ? "Tira el dado" : $"{who} va a tirar";
+                break;
             case TurnState.Moving:
-                hint = turns.IsLocalPlayersTurn ? $"Muévete con {(ResponsiveCanvas.IsTouchDevice ? "las flechas" : "WASD / flechas")} · {turns.MovesRemaining.Value} restantes" : $"Moviéndose · {turns.MovesRemaining.Value} restantes";
+                hint = mine ? $"Muévete: {Steps(turns.MovesRemaining.Value)}" : $"{who} se mueve";
                 if (turns.WallWalk.Value) hint += " · <color=#D080FF>atraviesa paredes</color>";
                 break;
-            case TurnState.CheckingTile: hint = "Comprobando casilla..."; break;
-            case TurnState.Combat: hint = CombatManager.Instance != null && CombatManager.Instance.IsDuel.Value ? "¡Duelo en curso!" : "¡Combate en curso!"; break;
-            case TurnState.TurnEnd: hint = "Fin del turno"; break;
-            case TurnState.GameOver: hint = "Partida terminada"; break;
-            case TurnState.Roulette: hint = "¡Ruleta!"; break;
-            case TurnState.Mission: hint = "¡Misión en curso!"; break;
+            case TurnState.CheckingTile: hint = "..."; break;
+            case TurnState.Combat:
+                if (combat != null && combat.IsDuel.Value)
+                {
+                    PlayerNetworkData defender = PlayerNetworkData.GetByPlayerId(combat.DefenderPlayerId.Value);
+                    string defenderName = defender != null ? defender.CharacterLabel : "?";
+
+                    if (combat.LocalSide == CombatManager.Side.Attacker) hint = $"<color=#FF8060>¡Duelo contra {defenderName}!</color>";
+                    else if (combat.LocalSide == CombatManager.Side.Defender) hint = $"<color=#FF8060>¡{who} te reta!</color>";
+                    else hint = $"Duelo: {who} vs {defenderName}";
+                }
+                else
+                {
+                    hint = mine ? "<color=#D080FF>¡Amenaza!</color>" : $"{who} combate";
+                }
+                break;
+            case TurnState.TurnEnd: hint = ""; break;
+            case TurnState.GameOver: hint = ""; break;
+            case TurnState.Roulette: hint = mine ? "¡Gira la ruleta!" : $"{who} gira la ruleta"; break;
+            case TurnState.Mission: hint = mine ? "¡Tu misión!" : $"{who} juega su misión"; break;
             default: hint = ""; break;
         }
 
         float secondsLeft = turns.SecondsLeft;
 
-        if (secondsLeft >= 0f)
-            hint += $"   <color=#FF8080>Tiempo: {Mathf.CeilToInt(secondsLeft)}s</color>";
+        if (secondsLeft >= 0f && !string.IsNullOrEmpty(hint))
+            hint += $"   <color=#FF8080>{Mathf.CeilToInt(secondsLeft)}s</color>";
 
-        hintText.text = hint;
+        hintText.text = eliminated ? "" : hint;
+    }
 
-        if (gameInfoText != null)
-        {
-            string roll = turns.LastRoll.Value > 0 ? turns.LastRoll.Value.ToString() : "-";
-            gameInfoText.text = $"DADO: [{roll}]\nMOVIMIENTOS: {turns.MovesRemaining.Value}";
-        }
+    private static string Steps(int n) => n == 1 ? "1 paso" : n + " pasos";
+
+    private static Color CharacterColor(PlayerNetworkData p)
+    {
+        CharacterData character = p != null ? p.Character : null;
+        Color c = character != null && character.boardColor.a > 0f ? character.boardColor : UIFactory.AccentColor;
+        return new Color(c.r, c.g, c.b, 1f);
     }
 
     private void RefreshPlayers(TurnManager turns)
@@ -499,13 +640,14 @@ public class GameHUD : MonoBehaviour
         foreach (PlayerNetworkData p in players)
         {
             bool isCurrent = p.PlayerId.Value == turns.CurrentPlayerId.Value && turns.State.Value != TurnState.GameOver;
-            string color = ColorUtility.ToHtmlStringRGB(p.Character != null && p.Character.boardColor.a > 0f ? p.Character.boardColor : Color.white);
+            string color = ColorUtility.ToHtmlStringRGB(CharacterColor(p));
 
-            sb.Append(isCurrent ? "<color=#FFD040>► </color>" : "   ");
-            sb.Append($"<color=#{color}><b>{p.Name}</b></color> — {CharacterName(p)}");
+            // ► marks the turn; ● is the character colour (same as the pawn and its turn ring).
+            sb.Append(isCurrent ? "<color=#FFD040>►</color> " : "   ");
+            sb.Append($"<color=#{color}>●</color> <b>{CharacterName(p)}</b>");
 
             if (p.IsOwner)
-                sb.Append(" <color=#FFD040>(tú)</color>");
+                sb.Append(" <size=80%><color=#FFD040>(tú)</color></size>");
 
             sb.Append('\n').Append("     ");
 
@@ -522,11 +664,14 @@ public class GameHUD : MonoBehaviour
                     break;
             }
 
-            string mission = p.MissionCompleted.Value ? "<color=#60FF60>Misión hecha</color>" : "Misión pendiente";
-            sb.Append($"   {mission}   Cartas {p.HandCount.Value}\n");
+            // Cards as a count, the mission as a single gold word when done.
+            sb.Append($"   <color=#9FB8FF>■ {p.HandCount.Value}</color>");
+
+            if (p.MissionCompleted.Value)
+                sb.Append("   <color=#FFD040>MISIÓN</color>");
 
             string status = p.IsAlive ? p.StatusSummary() : "";
-            sb.Append(string.IsNullOrEmpty(status) ? "\n" : $"     <size=85%><color=#D080FF>{status}</color></size>\n\n");
+            sb.Append(string.IsNullOrEmpty(status) ? "\n\n" : $"\n     <size=80%><color=#D080FF>{status}</color></size>\n\n");
         }
 
         playersText.text = sb.ToString();
@@ -540,8 +685,51 @@ public class GameHUD : MonoBehaviour
         bool canMove = turns.CanLocalPlayerMove();
         SetActionButtons(canRoll, canMove);
 
+        // Steps left in big letters while moving; nothing otherwise.
+        if (movesLabel != null)
+        {
+            movesLabel.text = canMove ? Steps(turns.MovesRemaining.Value).ToUpper() : "";
+            movesLabel.color = CharacterColor(local);
+        }
+
+        foreach (Button b in moveButtons)
+            b.gameObject.SetActive(canMove);
+
         if (turnCardButton != null)
+        {
+            // Only offered when the player holds a card that can be played now.
+            turnCardButton.gameObject.SetActive(canRoll && HasTurnCard(local));
             turnCardButton.interactable = turns.CanLocalPlayTurnCard(selectedHandIndex);
+        }
+    }
+
+    private static bool HasTurnCard(PlayerNetworkData local)
+    {
+        if (local == null || local.CardsBlocked)
+            return false;
+
+        foreach (int id in local.Hand)
+        {
+            if (CardRules.CanPlayOnOwnTurn(CardDatabase.Instance.GetById(id)))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>Breathing scale on a button that is waiting for the player (every frame).</summary>
+    private void PulseButtons()
+    {
+        float pulse = 1f + Mathf.Sin(Time.unscaledTime * 6f) * 0.05f;
+
+        if (rollTextButton != null)
+            rollTextButton.transform.localScale = rollTextButton.interactable ? Vector3.one * pulse : Vector3.one;
+
+        if (rollButton != null)
+            rollButton.transform.localScale = rollButton.interactable ? Vector3.one * pulse : Vector3.one;
+
+        if (combatRollButton != null)
+            combatRollButton.transform.localScale = combatRollButton.interactable && combatRollButton.gameObject.activeInHierarchy ? Vector3.one * pulse : Vector3.one;
     }
 
     private void SetActionButtons(bool canRoll, bool canMove)
@@ -574,17 +762,25 @@ public class GameHUD : MonoBehaviour
         bool canUse = CombatManager.Instance != null && CombatManager.Instance.CanLocalUseCard();
         bool canTurnCard = TurnManager.Instance != null && TurnManager.Instance.CanLocalPlayTurnCard(selectedHandIndex);
 
+        // The hand rises on your turn and whenever you are fighting (cards may be played then).
+        TurnManager turnManager = TurnManager.Instance;
+        bool myTurn = turnManager != null && turnManager.IsLocalPlayersTurn && turnManager.State.Value != TurnState.GameOver;
+        bool fighting = CombatManager.Instance != null && CombatManager.Instance.IsSpawned && CombatManager.Instance.IsActive && CombatManager.Instance.IsLocalFighter;
+        handRaised = myTurn || fighting;
+        handTitle.gameObject.SetActive(handRaised || selectedHandIndex >= 0);
+
         if (canUse)
-            handTitle.text = "MIS CARTAS — elige una y pulsa USAR CARTA";
+            handTitle.text = "<color=#7CFF8A>▲ Toca una carta y USAR</color>";
         else if (canTurnCard)
-            handTitle.text = "MIS CARTAS — pulsa USAR CARTA ESPECIAL";
+            handTitle.text = "<color=#C9A0FF>▲ USAR CARTA ESPECIAL</color>";
         else if (selectedHandIndex >= 0 && selectedHandIndex < local.Hand.Count)
-            handTitle.text = "MIS CARTAS — " + CardRules.TimingHint(CardDatabase.Instance.GetById(local.Hand[selectedHandIndex]));
+            handTitle.text = CardRules.TimingHint(CardDatabase.Instance.GetById(local.Hand[selectedHandIndex]));
         else
             handTitle.text = "MIS CARTAS";
 
+        // No yellow frame: the open card is shown by growing and rising (HandCard).
         for (int i = 0; i < handCardGlows.Count; i++)
-            handCardGlows[i].SetActive(i == selectedHandIndex);
+            handCardGlows[i].SetActive(false);
     }
 
     private void RebuildHand(PlayerNetworkData local)
@@ -594,6 +790,7 @@ public class GameHUD : MonoBehaviour
 
         shownHand.Clear();
         handCardGlows.Clear();
+        handCards.Clear();
         selectedHandIndex = -1;
 
         for (int i = 0; i < local.Hand.Count; i++)
@@ -621,13 +818,23 @@ public class GameHUD : MonoBehaviour
         CardType type = card != null ? card.type : null;
         Color typeColor = type != null ? type.color : Color.gray;
 
-        // Root: invisible hit area + button.
-        Image root = UIFactory.CreatePanel(handContainer, "Card_" + cardId, new Color(0f, 0f, 0f, 0f));
-        root.rectTransform.sizeDelta = new Vector2(HandCardWidth, HandCardHeight);
+        // Root: invisible hit area + button. Pivot at the bottom so the fan tilts around it.
+        Image cardRoot = UIFactory.CreatePanel(handContainer, "Card_" + cardId, new Color(0f, 0f, 0f, 0f));
+        UIFactory.Place(cardRoot.rectTransform, new Vector2(0.5f, 0f), Vector2.zero, new Vector2(HandCardWidth, HandCardHeight));
+        cardRoot.rectTransform.pivot = new Vector2(0.5f, 0f);
 
-        Button button = root.gameObject.AddComponent<Button>();
-        button.targetGraphic = root;
+        // Click = open the card (it becomes the selected card: bigger, raised) / close it again.
+        Button button = cardRoot.gameObject.AddComponent<Button>();
+        button.targetGraphic = cardRoot;
+        button.transition = Selectable.Transition.None;
         button.onClick.AddListener(() => selectedHandIndex = selectedHandIndex == index ? -1 : index);
+
+        // Face: the card art (always face-up).
+        RectTransform root = UIFactory.CreateRect(cardRoot.transform, "Face");
+        UIFactory.Stretch(root);
+
+        HandCard handCard = cardRoot.gameObject.AddComponent<HandCard>();
+        handCards.Add(handCard);
 
         // Selection glow behind the card.
         Image glow = UIFactory.CreatePanel(root.transform, "Glow", UIFactory.AccentColor);
@@ -707,48 +914,57 @@ public class GameHUD : MonoBehaviour
 
     private void RefreshEventCombat(CombatManager combat)
     {
-        combatTitle.text = "¡TE HAS ENCONTRADO CON UNA AMENAZA!";
-
         PlayerNetworkData fighter = PlayerNetworkData.GetByPlayerId(combat.CombatPlayerId.Value);
-        string fighterName = fighter != null ? fighter.Name : "?";
+        string who = fighter != null ? fighter.CharacterLabel : "?";
         bool isLocal = combat.IsLocalFighter;
 
+        combatTitle.text = isLocal ? "¡AMENAZA!" : $"¡AMENAZA PARA {who.ToUpper()}!";
+
+        // The target in big: "Saca 4+" (dice + bonus).
         StringBuilder body = new StringBuilder();
-        body.Append(isLocal ? "<color=#FFD040>¡Te toca combatir!</color>" : $"{fighterName} está combatiendo");
-        body.Append($"\nNecesitas sacar <b>{combat.Required.Value}</b> o más (dado 1–6 + bonus)");
+        body.Append(isLocal ? "Saca " : $"{who} necesita ");
+        body.Append($"<size=190%><b><color=#FFD040>{combat.Required.Value}+</color></b></size>");
 
         if (combat.LifeProtected.Value)
-            body.Append("\n<color=#80C0FF>Protegido: no perderá vida si falla</color>");
+            body.Append(isLocal
+                ? "\n<color=#80C0FF>Estás protegido: no perderás vida si fallas</color>"
+                : "\n<color=#80C0FF>Protegido: no perderá vida si falla</color>");
 
         AppendLastCard(body, combat);
 
         CombatPhase phase = combat.Phase.Value;
 
         if ((phase == CombatPhase.Won || phase == CombatPhase.Lost || phase == CombatPhase.Resolving) && combat.Roll.Value > 0)
-            body.Append($"\nTirada {RollText(combat.Roll.Value, combat.RollModifier.Value)} vs {combat.Required.Value}");
+            body.Append($"\n<size=140%>{RollText(combat.Roll.Value, combat.RollModifier.Value)}</size>");
         else if (combat.RollModifier.Value != 0)
-            body.Append($"\nBonus a la tirada: {Signed(combat.RollModifier.Value)}");
+            body.Append($"\n<color=#7CFF8A>Bonus {Signed(combat.RollModifier.Value)}</color>");
 
         combatBody.text = body.ToString();
+
+        string damage = combat.LifeLoss.Value > 0 ? $"(-{combat.LifeLoss.Value} {Heart})" : "(sin daño)";
 
         switch (phase)
         {
             case CombatPhase.Escaped:
-                combatResult.text = "<color=#80C0FF>¡ESCAPÓ DE LA ENTIDAD!</color>";
+                combatResult.text = isLocal
+                    ? "<color=#80C0FF>¡ESCAPASTE DE LA ENTIDAD!</color>"
+                    : $"<color=#80C0FF>¡{who.ToUpper()} ESCAPÓ DE LA ENTIDAD!</color>";
                 break;
             case CombatPhase.Won:
-                combatResult.text = "<color=#60FF60>¡SUPERASTE EL EVENTO!</color>";
+                combatResult.text = isLocal
+                    ? "<color=#60FF60>¡SUPERASTE EL EVENTO!</color>"
+                    : $"<color=#60FF60>¡{who.ToUpper()} SUPERÓ EL EVENTO!</color>";
                 break;
             case CombatPhase.Lost:
-                combatResult.text = combat.LifeLoss.Value > 0
-                    ? $"<color=#FF5050>FALLASTE EL EVENTO</color> <size=70%>(-{combat.LifeLoss.Value} {Heart})</size>"
-                    : "<color=#FF5050>FALLASTE EL EVENTO</color> <size=70%>(sin daño)</size>";
+                combatResult.text = (isLocal
+                    ? "<color=#FF5050>FALLASTE EL EVENTO</color>"
+                    : $"<color=#FF5050>{who.ToUpper()} FALLÓ EL EVENTO</color>") + $" <size=70%>{damage}</size>";
                 break;
             case CombatPhase.CardPhase:
-                combatResult.text = isLocal ? "<size=70%>¿Usar una carta?</size>" : "";
+                combatResult.text = isLocal ? "<size=70%>¿Usar una carta?</size>" : $"<size=70%>{who} puede usar una carta...</size>";
                 break;
             case CombatPhase.Rolling:
-                combatResult.text = isLocal ? "<size=70%>¡Tira el dado!</size>" : "";
+                combatResult.text = isLocal ? "<size=70%>¡Tira el dado!</size>" : $"<size=70%>Esperando la tirada de {who}...</size>";
                 break;
             default:
                 combatResult.text = "";
@@ -758,68 +974,79 @@ public class GameHUD : MonoBehaviour
 
     private void RefreshDuel(CombatManager combat)
     {
-        combatTitle.text = "¡DUELO!";
-
         PlayerNetworkData attacker = PlayerNetworkData.GetByPlayerId(combat.CombatPlayerId.Value);
         PlayerNetworkData defender = PlayerNetworkData.GetByPlayerId(combat.DefenderPlayerId.Value);
         CombatManager.Side side = combat.LocalSide;
 
+        string attackerName = attacker != null ? attacker.CharacterLabel : "?";
+        string defenderName = defender != null ? defender.CharacterLabel : "?";
+        string rivalName = side == CombatManager.Side.Attacker ? defenderName : attackerName;
+
+        combatTitle.text = side != CombatManager.Side.None ? $"¡DUELO CONTRA {rivalName.ToUpper()}!" : "¡DUELO!";
+
         StringBuilder body = new StringBuilder();
 
         if (side != CombatManager.Side.None)
-            body.Append("<color=#FFD040>¡Estás en un duelo! Usa una carta si quieres y tira tu dado.</color>\n");
+            body.Append("<color=#FFD040>Carta (opcional) y tira el dado</color>\n");
         else
-            body.Append("Mayor resultado gana · el perdedor pierde una vida\n");
+            body.Append("<size=85%>Gana el mayor · el perdedor pierde 1 ♥</size>\n");
 
         body.Append(DuelLine(attacker, combat.Roll.Value, combat.RollModifier.Value, combat.LifeProtected.Value));
-        body.Append("\n<size=80%>contra</size>\n");
+        body.Append("\n<size=90%><color=#FF8060>VS</color></size>\n");
         body.Append(DuelLine(defender, combat.DefenderRoll.Value, combat.DefenderModifier.Value, combat.DefenderProtected.Value));
         AppendLastCard(body, combat);
         combatBody.text = body.ToString();
 
-        string attackerName = attacker != null ? attacker.Name : "?";
-        string defenderName = defender != null ? defender.Name : "?";
-
         switch (combat.Phase.Value)
         {
             case CombatPhase.Won:
-                combatResult.text = $"<color=#60FF60>¡GANA {attackerName}!</color>" + LossText(defenderName, combat.DefenderLifeLoss.Value);
+                combatResult.text = DuelResult(side, CombatManager.Side.Attacker, attackerName, defender, combat.DefenderLifeLoss.Value);
                 break;
             case CombatPhase.Lost:
-                combatResult.text = $"<color=#60FF60>¡GANA {defenderName}!</color>" + LossText(attackerName, combat.LifeLoss.Value);
+                combatResult.text = DuelResult(side, CombatManager.Side.Defender, defenderName, attacker, combat.LifeLoss.Value);
                 break;
             case CombatPhase.Escaped:
-                combatResult.text = "<color=#80C0FF>¡ESCAPÓ DEL DUELO!</color> <size=60%>nadie pierde vida</size>";
+                combatResult.text = "<color=#80C0FF>¡DUELO INTERRUMPIDO!</color> <size=60%>nadie pierde vida</size>";
                 break;
             case CombatPhase.Draw:
                 combatResult.text = "<color=#FFD040>¡EMPATE!</color> <size=60%>nadie pierde vida</size>";
                 break;
             default:
-                combatResult.text = side != CombatManager.Side.None && combat.HasRolled(side)
-                    ? "<size=70%>Esperando la tirada del rival...</size>"
-                    : "";
+                if (side != CombatManager.Side.None && combat.HasRolled(side))
+                    combatResult.text = $"<size=70%>Esperando la tirada de {rivalName}...</size>";
+                else if (side == CombatManager.Side.None)
+                    combatResult.text = "<size=70%>Esperando las tiradas...</size>";
+                else
+                    combatResult.text = "";
                 break;
         }
     }
 
-    private static string DuelLine(PlayerNetworkData p, int roll, int modifier, bool protectedFromDamage)
+    /// <summary>"¡GANASTE EL DUELO!" / "PERDISTE EL DUELO" for the duelists, "¡GANA X!" for the spectators.</summary>
+    private static string DuelResult(CombatManager.Side localSide, CombatManager.Side winnerSide, string winnerName, PlayerNetworkData loser, int lifeLoss)
     {
-        string name = p != null ? p.Name : "?";
-        string rollText = roll > 0 ? RollText(roll, modifier) : (modifier != 0 ? $"sin tirar (bonus {Signed(modifier)})" : "sin tirar");
-        string shield = protectedFromDamage ? " <color=#80C0FF>(protegido)</color>" : "";
-        return $"<b>{name}</b>: {rollText}{shield}";
+        string loss = lifeLoss > 0 ? $"-{lifeLoss} {Heart}" : "sin daño";
+
+        if (localSide == winnerSide)
+            return $"<color=#60FF60>¡GANASTE EL DUELO!</color> <size=60%>{(loser != null ? loser.CharacterLabel : "?")} {loss}</size>";
+
+        if (localSide != CombatManager.Side.None)
+            return $"<color=#FF5050>PERDISTE EL DUELO</color> <size=60%>{(lifeLoss > 0 ? $"pierdes {lifeLoss} {Heart}" : "sin daño")}</size>";
+
+        return $"<color=#60FF60>¡GANA {winnerName.ToUpper()}!</color> <size=60%>{(loser != null ? loser.CharacterLabel : "?")} {loss}</size>";
     }
 
-    private static string LossText(string loserName, int lifeLoss)
+    private static string DuelLine(PlayerNetworkData p, int roll, int modifier, bool protectedFromDamage)
     {
-        return lifeLoss > 0
-            ? $" <size=60%>{loserName} -{lifeLoss} {Heart}</size>"
-            : $" <size=60%>{loserName} sin daño</size>";
+        string name = p == null ? "?" : p.IsOwner ? "Tú" : p.CharacterLabel;
+        string rollText = roll > 0 ? $"<size=150%>{RollText(roll, modifier)}</size>" : (modifier != 0 ? $"? <color=#7CFF8A>({Signed(modifier)})</color>" : "?");
+        string shield = protectedFromDamage ? " <color=#80C0FF>(escudo)</color>" : "";
+        return $"<color=#{ColorUtility.ToHtmlStringRGB(CharacterColor(p))}>●</color> <b>{name}</b>  {rollText}{shield}";
     }
 
     private static string RollText(int roll, int modifier)
     {
-        return $"{roll} {Signed(modifier)} = <b>{roll + modifier}</b>";
+        return modifier == 0 ? $"<b>{roll}</b>" : $"{roll} {Signed(modifier)} = <b>{roll + modifier}</b>";
     }
 
     private static string Signed(int value)
@@ -829,7 +1056,7 @@ public class GameHUD : MonoBehaviour
 
     private static void AppendLastCard(StringBuilder body, CombatManager combat)
     {
-        string lastCard = combat.LastCardText.Value.ToString();
+        string lastCard = combat.LocalLastCardText();
 
         if (!string.IsNullOrEmpty(lastCard))
             body.Append($"\n<color=#C0FFC0>{lastCard}</color>");
@@ -845,18 +1072,26 @@ public class GameHUD : MonoBehaviour
 
         int winnerId = game.WinnerPlayerId.Value;
         PlayerNetworkData winner = PlayerNetworkData.GetByPlayerId(winnerId);
+        bool localWon = winner != null && local != null && local.PlayerId.Value == winnerId;
 
         StringBuilder sb = new StringBuilder();
 
-        if (winner != null)
+        if (localWon)
         {
-            sb.Append($"Ganador: <b>{winner.Name}</b> ({CharacterName(winner)})");
+            sb.Append("<color=#FFD040><b>¡HAS GANADO!</b></color>");
+            sb.Append(winner.MissionCompleted.Value
+                ? "\n<size=80%>¡completaste tu misión!</size>"
+                : "\n<size=80%>eres el último jugador en pie</size>");
+        }
+        else if (winner != null)
+        {
+            sb.Append($"Ganador: <b>{winner.CharacterLabel}</b> ({winner.Name})");
             sb.Append(winner.MissionCompleted.Value
                 ? "\n<size=80%>¡completó su misión!</size>"
                 : "\n<size=80%>último jugador en pie</size>");
 
-            if (local != null && local.PlayerId.Value == winnerId)
-                sb.Append("\n\n<color=#FFD040>¡HAS COMPLETADO LA PARTIDA!</color>");
+            if (local != null)
+                sb.Append("\n\n<color=#FF8080>Has perdido</color>");
         }
         else
         {
@@ -911,7 +1146,7 @@ public class GameHUD : MonoBehaviour
 
         PlayerNetworkData spinner = PlayerNetworkData.GetByPlayerId(manager.PlayerId.Value);
         bool isLocalSpinner = spinner != null && spinner.IsOwner;
-        roulette.Show(spinner != null ? spinner.Name : "?", isLocalSpinner, manager.CanLocalSpin(), manager.AutoSpinSecondsLeft);
+        roulette.Show(spinner != null ? spinner.CharacterLabel : "?", isLocalSpinner, manager.CanLocalSpin(), manager.AutoSpinSecondsLeft);
 
         // New spin from the Host: animate to the same result on every instance.
         if (manager.SpinId.Value != shownSpinId && manager.Phase.Value != RoulettePhase.WaitingSpin)
@@ -923,7 +1158,7 @@ public class GameHUD : MonoBehaviour
         }
 
         if (manager.Phase.Value == RoulettePhase.ShowingResult && manager.Result != null)
-            roulette.ShowResult(manager.Result.resultText);
+            roulette.ShowResult(isLocalSpinner || spinner == null ? manager.Result.resultText : manager.Result.OthersText(spinner.CharacterLabel));
     }
 
     private void OnSpinClicked()
@@ -984,7 +1219,7 @@ public class GameHUD : MonoBehaviour
             missionShownFor = manager.PlayerId.Value;
             missionResultShown = MissionPhase.None;
             missionMinigame.Finished += success => MissionManager.Instance?.RequestFinishFromLocal(success);
-            missionMinigame.Begin(definition, player != null ? player.Name : "?", player != null ? CharacterName(player) : "?", manager.IsLocalMission);
+            missionMinigame.Begin(definition, player != null ? player.CharacterLabel : "?", player != null ? CharacterName(player) : "?", manager.IsLocalMission);
             // Minigame panels are designed big; shrink them on small screens.
             ScaleToFit.ApplyToChildren(instance.transform);
 

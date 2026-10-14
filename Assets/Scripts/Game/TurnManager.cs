@@ -16,6 +16,10 @@ public class TurnManager : NetworkBehaviour
     public NetworkVariable<int> CurrentPlayerId = new NetworkVariable<int>(TurnRotation.NoPlayer);
     public NetworkVariable<TurnState> State = new NetworkVariable<TurnState>(TurnState.WaitingForBoard);
     public NetworkVariable<int> LastRoll = new NetworkVariable<int>(0);
+    /// <summary>Increments on every roll: clients play the dice animation when it changes.</summary>
+    public NetworkVariable<int> RollCount = new NetworkVariable<int>(0);
+    /// <summary>True while the dice animation plays (the roll is decided, movement not open yet).</summary>
+    public NetworkVariable<bool> DiceRolling = new NetworkVariable<bool>(false);
     public NetworkVariable<int> MovesRemaining = new NetworkVariable<int>(0);
     public NetworkVariable<int> TurnNumber = new NetworkVariable<int>(0);
 
@@ -107,7 +111,7 @@ public class TurnManager : NetworkBehaviour
         }
     }
 
-    public bool CanLocalPlayerRoll() => IsSpawned && IsLocalPlayersTurn && State.Value == TurnState.WaitingForRoll;
+    public bool CanLocalPlayerRoll() => IsSpawned && IsLocalPlayersTurn && State.Value == TurnState.WaitingForRoll && !DiceRolling.Value;
 
     public bool CanLocalPlayerMove() => IsSpawned && IsLocalPlayersTurn && State.Value == TurnState.Moving && MovesRemaining.Value > 0;
 
@@ -171,7 +175,7 @@ public class TurnManager : NetworkBehaviour
         }
 
         PlayerNetworkData firstPlayer = PlayerNetworkData.GetByPlayerId(first);
-        GameStateManager.Instance.ServerBroadcast($"¡Empieza la partida! Comienza {firstPlayer.Name}");
+        GameStateManager.Instance.ServerBroadcast(firstPlayer, "¡Empieza la partida! Empiezas tú", $"¡Empieza la partida! Empieza {firstPlayer.CharacterLabel}");
         ServerBeginTurn(first);
     }
 
@@ -191,8 +195,24 @@ public class TurnManager : NetworkBehaviour
         avoidedEventsThisTurn.Clear();
         engagedEventsThisTurn.Clear();
         WallWalk.Value = false;
+        DiceRolling.Value = false;
         RestartDeadline();
         State.Value = TurnState.WaitingForRoll;
+
+        PlayerNetworkData player = PlayerNetworkData.GetByPlayerId(playerId);
+
+        if (player == null)
+            return;
+
+        GameStateManager.Instance.ServerBroadcast(player, "<color=#FFD040>¡Es tu turno!</color>", $"Turno de {player.CharacterLabel}");
+
+        // Failed mission: still on the mission tile, so the new turn retries it right away (no roll).
+        if (MissionManager.Instance != null && IsPendingMissionCell(player, player.GridPosition.Value))
+        {
+            State.Value = TurnState.Mission;
+            RestartDeadline();
+            MissionManager.Instance.ServerBegin(player);
+        }
     }
 
     public void ServerSetState(TurnState state)
@@ -246,7 +266,7 @@ public class TurnManager : NetworkBehaviour
 
             candidate.SkipTurns.Value--;
             candidate.ServerTickTurnEffects();
-            GameStateManager.Instance.ServerBroadcast($"{candidate.Name} pierde este turno");
+            GameStateManager.Instance.ServerBroadcast(candidate, "Pierdes este turno (ruleta)", $"{candidate.CharacterLabel} pierde este turno (ruleta)");
             next = TurnRotation.GetNextPlayer(next, states);
         }
 
@@ -347,21 +367,53 @@ public class TurnManager : NetworkBehaviour
         if (!ValidateActivePlayer(rpcParams.Receive.SenderClientId, TurnState.WaitingForRoll, out PlayerNetworkData player, "Roll"))
             return;
 
+        // The dice is already rolling (duplicate request).
+        if (DiceRolling.Value)
+            return;
+
         ServerRoll(player);
     }
 
+    /// <summary>Decides the roll now; everyone sees the dice tumble before the movement opens.</summary>
     private void ServerRoll(PlayerNetworkData player)
     {
         int roll = UnityEngine.Random.Range(Rules.diceMin, Rules.diceMax + 1);
+
+        LastRoll.Value = roll;
+        RollCount.Value++;
+        Debug.Log($"{NetworkConnectionManager.GetInstanceTag()} [Dado] {player.Name} lanza ({roll})");
+
+        if (Rules.diceAnimationSeconds <= 0f)
+        {
+            ServerApplyRoll(player, roll);
+            return;
+        }
+
+        DiceRolling.Value = true;
+        StopPending();
+        pendingRoutine = StartCoroutine(ApplyRollAfterAnimation(player, roll));
+    }
+
+    private IEnumerator ApplyRollAfterAnimation(PlayerNetworkData player, int roll)
+    {
+        yield return new WaitForSeconds(Rules.diceAnimationSeconds);
+        pendingRoutine = null;
+        DiceRolling.Value = false;
+
+        if (State.Value == TurnState.WaitingForRoll && player != null && player.IsAlive && player.PlayerId.Value == CurrentPlayerId.Value)
+            ServerApplyRoll(player, roll);
+    }
+
+    private void ServerApplyRoll(PlayerNetworkData player, int roll)
+    {
 
         // Roulette "-movimiento" is consumed by this roll.
         int penalty = player.MovePenalty.Value;
         player.MovePenalty.Value = 0;
 
         if (penalty > 0)
-            GameStateManager.Instance.ServerBroadcast($"{player.Name}: {roll} - {penalty} por la ruleta");
+            GameStateManager.Instance.ServerBroadcast(player, $"Sacaste {roll} - {penalty} por la ruleta", $"{player.CharacterLabel} sacó {roll} - {penalty} por la ruleta");
 
-        LastRoll.Value = roll;
         MovesRemaining.Value = Mathf.Max(0, roll - penalty);
         State.Value = TurnState.Moving;
 
@@ -484,11 +536,11 @@ public class TurnManager : NetworkBehaviour
 
         if (!SpecialCardEffect.Succeeds(player.EventShieldChance.Value, UnityEngine.Random.value))
         {
-            GameStateManager.Instance.ServerBroadcast($"{player.Name} no logra esquivar a la entidad");
+            GameStateManager.Instance.ServerBroadcast(player, "No logras esquivar a la entidad", $"{player.CharacterLabel} no logra esquivar a la entidad");
             return false;
         }
 
-        GameStateManager.Instance.ServerBroadcast($"{player.Name} esquiva a la entidad en silencio");
+        GameStateManager.Instance.ServerBroadcast(player, "Esquivas a la entidad en silencio", $"{player.CharacterLabel} esquiva a la entidad en silencio");
         return true;
     }
 
@@ -625,7 +677,7 @@ public class TurnManager : NetworkBehaviour
     {
         ulong sender = rpcParams.Receive.SenderClientId;
 
-        if (!ValidateActivePlayer(sender, TurnState.WaitingForRoll, out PlayerNetworkData player, "PlayTurnCard"))
+        if (!ValidateActivePlayer(sender, TurnState.WaitingForRoll, out PlayerNetworkData player, "PlayTurnCard") || DiceRolling.Value)
             return;
 
         GameStateManager game = GameStateManager.Instance;
@@ -665,7 +717,7 @@ public class TurnManager : NetworkBehaviour
 
         player.ServerRemoveCardAt(handIndex);
         turnCardUsedThisTurn = true;
-        game.ServerBroadcast($"{player.Name} usó {card.displayName}");
+        game.ServerBroadcast(player, $"Usaste {card.displayName}", $"{player.CharacterLabel} usó {card.displayName}");
 
         switch (special.ability)
         {
@@ -737,22 +789,22 @@ public class TurnManager : NetworkBehaviour
         {
             case TurnState.WaitingForRoll:
             case TurnState.Moving:
-                GameStateManager.Instance.ServerBroadcast($"Tiempo agotado: {player?.Name} pierde el turno");
+                GameStateManager.Instance.ServerBroadcast(player, "Tiempo agotado: pierdes el turno", $"Tiempo agotado: {player?.CharacterLabel} pierde el turno");
                 ServerEndTurn();
                 break;
 
             case TurnState.Combat:
-                GameStateManager.Instance.ServerBroadcast("Tiempo agotado: tirada automática");
+                GameStateManager.Instance.ServerBroadcast(player, "Tiempo agotado: se tira el dado por ti", $"Tiempo agotado: tirada automática de {player?.CharacterLabel}");
                 CombatManager.Instance.ServerForceRoll();
                 break;
 
             case TurnState.Roulette:
-                GameStateManager.Instance.ServerBroadcast("Tiempo agotado: la ruleta gira sola");
+                GameStateManager.Instance.ServerBroadcast(player, "Tiempo agotado: tu ruleta gira sola", $"Tiempo agotado: la ruleta de {player?.CharacterLabel} gira sola");
                 RouletteManager.Instance.ServerForceSpin();
                 break;
 
             case TurnState.Mission:
-                GameStateManager.Instance.ServerBroadcast("Tiempo agotado: la misión falla");
+                GameStateManager.Instance.ServerBroadcast(player, "Tiempo agotado: tu misión falla", $"Tiempo agotado: la misión de {player?.CharacterLabel} falla");
                 MissionManager.Instance.ServerForceFail();
                 break;
         }

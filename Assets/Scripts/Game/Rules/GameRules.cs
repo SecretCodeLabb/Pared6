@@ -25,6 +25,8 @@ public class GameRules : ScriptableObject
     [Header("Dice")]
     public int diceMin = 1;
     public int diceMax = 6;
+    [Tooltip("Seconds the dice tumbles on screen before the player can move (0 = instant).")]
+    [Min(0f)] public float diceAnimationSeconds = 1.3f;
 
     [Header("Board")]
     [Range(1, 20)] public int eventTileCount = 5;

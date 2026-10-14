@@ -6,6 +6,18 @@ public class PlayerController : MonoBehaviour
     [Header("Movement")]
     public float moveSpeed = 5f;
 
+    [Header("Step feel (network game)")]
+    [Tooltip("Height of the little hop on every step.")]
+    public float hopHeight = 0.55f;
+    [Tooltip("Minimum seconds per step.")]
+    public float minStepSeconds = 0.22f;
+
+    /// <summary>Raised when a pawn lands on a tile after a step (dust / sound effects).</summary>
+    public static event System.Action<PlayerController> StepLanded;
+
+    private Vector3 baseScale = Vector3.one;
+    private bool hasBaseScale;
+
     [HideInInspector]
     public Tile currentTile;
 
@@ -65,6 +77,9 @@ public class PlayerController : MonoBehaviour
         StopAllCoroutines();
         isMoving = false;
 
+        if (hasBaseScale)
+            transform.localScale = baseScale;
+
         if (currentTile != null)
             transform.position = currentTile.transform.position + visualOffset;
     }
@@ -84,23 +99,41 @@ public class PlayerController : MonoBehaviour
 
     private System.Collections.IEnumerator PlayPendingMoves()
     {
+        if (!hasBaseScale)
+        {
+            baseScale = transform.localScale;
+            hasBaseScale = true;
+        }
+
         while (pendingTargets.Count > 0)
         {
+            Vector3 start = transform.position;
             Vector3 target = pendingTargets.Dequeue();
             isMoving = true;
 
-            while (Vector3.Distance(transform.position, target) > 0.01f)
-            {
-                transform.position = Vector3.MoveTowards(
-                    transform.position,
-                    target,
-                    moveSpeed * Time.deltaTime
-                );
+            // Hop from tile to tile: arc on Y, stretch while in the air, squash on landing.
+            float duration = Mathf.Max(minStepSeconds, Vector3.Distance(start, target) / Mathf.Max(0.1f, moveSpeed));
+            float hop = pendingTargets.Count > 2 ? hopHeight * 0.6f : hopHeight;
 
+            for (float t = 0f; t < 1f; t += Time.deltaTime / duration)
+            {
+                float arc = Mathf.Sin(t * Mathf.PI);
+                transform.position = Vector3.Lerp(start, target, t) + Vector3.up * arc * hop;
+                transform.localScale = Vector3.Scale(baseScale, new Vector3(1f - arc * 0.08f, 1f + arc * 0.12f, 1f - arc * 0.08f));
                 yield return null;
             }
 
             transform.position = target;
+            StepLanded?.Invoke(this);
+
+            for (float t = 0f; t < 1f; t += Time.deltaTime / 0.12f)
+            {
+                float squash = Mathf.Sin(t * Mathf.PI) * 0.18f;
+                transform.localScale = Vector3.Scale(baseScale, new Vector3(1f + squash, 1f - squash, 1f + squash));
+                yield return null;
+            }
+
+            transform.localScale = baseScale;
         }
 
         isMoving = false;

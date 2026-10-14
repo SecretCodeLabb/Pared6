@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 71585aaf630262e46b60e6f0f144237e, type: 3}
+  m_Name: FxConfig
+  m_EditorClassIdentifier: Assembly-CSharp::FxConfig
+  particleMaterial: {fileID: 2100000, guid: 19519b1da3b3f2f40b65a8be03af847e, type: 2}
+  ringMaterial: {fileID: 2100000, guid: 924c4b461e1e99b4c986c76a9b19cdde, type: 2}
+  tubeMaterial: {fileID: 2100000, guid: ce2324df3ad956349982f0f285002062, type: 2}
+  softCircle: {fileID: 21300000, guid: 4cf1d1fa3febba84e910abf0472c3252, type: 3}
+  roundedSquare: {fileID: 21300000, guid: 6baea0147704e114098ce4e5e5893ece, type: 3}
+  diceFace: {fileID: 21300000, guid: a41985853129c974c898b91d35fb0485, type: 3}
+  pip: {fileID: 21300000, guid: af77ff4e18be8444b9e0226fea5989b0, type: 3}

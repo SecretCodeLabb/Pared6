@@ -51,6 +51,23 @@ public class BoardCameraController : MonoBehaviour
 
     public bool IsFollowing => followActivePlayer;
 
+    // Screen shake (combat, events, damage): decaying random offset added on top of the framing.
+    private static BoardCameraController active;
+    private float shakeAmplitude;
+    private float shakeDuration;
+    private float shakeTime;
+
+    /// <summary>Shakes the game camera (world units, seconds). Stronger shakes override weaker ones.</summary>
+    public static void Shake(float amplitude, float duration)
+    {
+        if (active == null || (active.shakeTime < active.shakeDuration && amplitude < active.shakeAmplitude * (1f - active.shakeTime / active.shakeDuration)))
+            return;
+
+        active.shakeAmplitude = amplitude;
+        active.shakeDuration = Mathf.Max(0.01f, duration);
+        active.shakeTime = 0f;
+    }
+
     /// <summary>Switches between following the turn and the whole-board view (C key / HUD button).</summary>
     public void ToggleView()
     {
@@ -180,7 +197,28 @@ public class BoardCameraController : MonoBehaviour
 
     private void Apply()
     {
-        transform.position = pivot - transform.forward * distance;
+        Vector3 offset = Vector3.zero;
+
+        if (shakeTime < shakeDuration)
+        {
+            shakeTime += Time.deltaTime;
+            float strength = shakeAmplitude * (1f - shakeTime / shakeDuration);
+            offset = (transform.right * (Mathf.PerlinNoise(Time.time * 30f, 0f) - 0.5f) +
+                      transform.up * (Mathf.PerlinNoise(0f, Time.time * 30f) - 0.5f)) * 2f * strength;
+        }
+
+        transform.position = pivot - transform.forward * distance + offset;
+    }
+
+    private void OnEnable()
+    {
+        active = this;
+    }
+
+    private void OnDisable()
+    {
+        if (active == this)
+            active = null;
     }
 
     /// <summary>The pawn to follow, or null for the overview.</summary>

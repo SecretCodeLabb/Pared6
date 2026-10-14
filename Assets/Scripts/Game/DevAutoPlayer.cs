@@ -15,6 +15,8 @@ using UnityEngine.SceneManagement;
 ///   -games N             full games the host plays before leaving (default 1)
 ///   -quitonmenu          quit when back in the menu after having played
 ///   -hardrules           (host, testing) harder combats and 2 lives to force eliminations / revives
+///   -character NAME      pick this character (CharacterData.characterName) if it is free
+///   -demohand            open / close the cards of the hand every few seconds (UI showcase)
 /// In the Editor: DevAutoPlayer.Enable(autoPlay: true).
 /// It only uses the same requests as the UI; the Host validates everything.
 /// </summary>
@@ -29,6 +31,10 @@ public class DevAutoPlayer : MonoBehaviour
     private bool quitOnMenu;
     private int playersNeeded = 2;
     private int gamesToPlay = 1;
+    private string preferredCharacter;
+    private static bool demoHand;
+    private float nextHandDemo;
+    private int handDemoIndex = -1;
 
     private bool hasJoined;
     private bool hostStarted;
@@ -44,6 +50,7 @@ public class DevAutoPlayer : MonoBehaviour
     {
         string[] args = Environment.GetCommandLineArgs();
         string ip = null;
+        string character = null;
         bool host = false, play = false, quit = false, hard = false;
         int players = 2, games = 1;
 
@@ -54,6 +61,8 @@ public class DevAutoPlayer : MonoBehaviour
             if (args[i] == "-autoplay") play = true;
             if (args[i] == "-quitonmenu") quit = true;
             if (args[i] == "-hardrules") hard = true;
+            if (args[i] == "-character" && i + 1 < args.Length) character = args[i + 1];
+            if (args[i] == "-demohand") demoHand = true;
             if (args[i] == "-players" && i + 1 < args.Length) int.TryParse(args[i + 1], out players);
             if (args[i] == "-games" && i + 1 < args.Length) int.TryParse(args[i + 1], out games);
         }
@@ -75,6 +84,7 @@ public class DevAutoPlayer : MonoBehaviour
         bot.quitOnMenu = quit;
         bot.playersNeeded = Mathf.Max(1, players);
         bot.gamesToPlay = Mathf.Max(1, games);
+        bot.preferredCharacter = character;
         Debug.Log($"[DevAutoPlayer] host {host} join {ip} play {play} players {bot.playersNeeded} games {bot.gamesToPlay}");
     }
 
@@ -185,7 +195,12 @@ public class DevAutoPlayer : MonoBehaviour
                     free.Add(id);
             }
 
-            if (free.Count > 0)
+            int preferred = free.FindIndex(id => CharacterCatalog.Instance.Get(id) != null &&
+                string.Equals(CharacterCatalog.Instance.Get(id).characterName, preferredCharacter, StringComparison.OrdinalIgnoreCase));
+
+            if (preferred >= 0)
+                lobby.RequestSelectCharacterRpc(free[preferred]);
+            else if (free.Count > 0)
                 lobby.RequestSelectCharacterRpc(free[rng.Next(free.Count)]);
 
             return;
@@ -217,6 +232,17 @@ public class DevAutoPlayer : MonoBehaviour
         if (turns == null || local == null || !turns.IsSpawned)
             return;
 
+        if (demoHand && Time.unscaledTime >= nextHandDemo && local.Hand.Count > 0)
+        {
+            // Cycles: closed, card 0 open, closed, card 1 open...
+            nextHandDemo = Time.unscaledTime + 2.5f;
+            handDemoIndex = handDemoIndex >= 0 ? -1 : (int)(Time.unscaledTime / 5f) % local.Hand.Count;
+            GameHUD hud = FindFirstObjectByType<GameHUD>();
+
+            if (hud != null)
+                hud.SelectHandCard(handDemoIndex);
+        }
+
         if (turns.State.Value == TurnState.GameOver)
         {
             HandleGameOver();
@@ -245,6 +271,20 @@ public class DevAutoPlayer : MonoBehaviour
 
         if (mission != null && mission.IsSpawned && mission.Phase.Value == MissionPhase.Active && mission.IsLocalMission)
         {
+            // Real minigames that can play themselves are played (and report their own result).
+            MissionMinigame minigame = FindFirstObjectByType<MissionMinigame>();
+
+            if (minigame != null && minigame.SupportsAutoPlay)
+            {
+                if (!minigame.AutoPlay)
+                {
+                    minigame.AutoPlay = true;
+                    Debug.Log("[DevAutoPlayer] mission minigame autoplay: " + minigame.GetType().Name);
+                }
+
+                return;
+            }
+
             // Fail sometimes so the retry path gets exercised.
             bool success = rng.NextDouble() < 0.6;
             Debug.Log("[DevAutoPlayer] mission " + (success ? "completed" : "failed"));
