@@ -12,8 +12,8 @@ using UnityEngine;
 public static class RoomThemeSetup
 {
     private const string RoomsDir = "Assets/Prefabs/Rooms";
-    private const string BaseRoomPath = "Assets/Prefabs/Room_01.prefab";
-    private const string BaseTilePath = "Assets/Prefabs/TilesRoom.prefab";
+    private const string BaseRoomPath = "Assets/Prefabs/Rooms/Room_01.prefab";
+    private const string BaseTilePath = "Assets/Prefabs/Board/TilesRoom.prefab";
 
     private struct Prop
     {

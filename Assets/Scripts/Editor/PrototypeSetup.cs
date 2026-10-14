@@ -21,7 +21,7 @@ public static class PrototypeSetup
     private const string ResourcesDir = "Assets/Resources";
     private const string NetworkPrefabDir = "Assets/Prefabs/Network";
     private const string SessionPrefabPath = NetworkPrefabDir + "/NetworkSession.prefab";
-    private const string PlayerPrefabPath = "Assets/Prefabs/Player.prefab";
+    private const string PlayerPrefabPath = "Assets/Prefabs/Players/Player.prefab";
     private const string NetworkPrefabsListPath = "Assets/DefaultNetworkPrefabs.asset";
 
     [MenuItem("PPOP/Setup Prototype")]
@@ -90,7 +90,7 @@ public static class PrototypeSetup
 
             foreach (string n in names)
             {
-                CharacterData data = AssetDatabase.LoadAssetAtPath<CharacterData>("Assets/Data/Characters/Character_" + n + ".asset");
+                CharacterData data = AssetDatabase.LoadAssetAtPath<CharacterData>("Assets/ScriptableObjects/Characters/Character_" + n + ".asset");
 
                 if (data != null)
                     catalog.characters.Add(data);

@@ -16,7 +16,7 @@ public static class CardDesignSetup
 {
     private const string DesignDir = "Assets/Resources/CardsDesign/";
     private const string TypesDir = "Assets/ScriptableObjects/Cards/Types/";
-    private const string CharacterCardPath = "Assets/Prefabs/CharacterCard.prefab";
+    private const string CharacterCardPath = "Assets/Prefabs/UI/CharacterCard.prefab";
     private const string SelectionScenePath = "Assets/Scenes/CharacterSelection.unity";
 
     [MenuItem("PPOP/Apply Card Designs")]

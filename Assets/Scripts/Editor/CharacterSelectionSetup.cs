@@ -27,7 +27,7 @@ public static class CharacterSelectionSetup
         
         // 1. Create ScriptableObjects
         List<CharacterData> characters = new List<CharacterData>();
-        string dataPath = "Assets/Data/Characters";
+        string dataPath = "Assets/ScriptableObjects/Characters";
         if (!AssetDatabase.IsValidFolder(dataPath))
         {
             System.IO.Directory.CreateDirectory(dataPath);
@@ -59,7 +59,7 @@ public static class CharacterSelectionSetup
         AssetDatabase.SaveAssets();
 
         // 2. Create Prefab
-        string prefabFolder = "Assets/Prefabs";
+        string prefabFolder = "Assets/Prefabs/UI";
         if (!AssetDatabase.IsValidFolder(prefabFolder)) System.IO.Directory.CreateDirectory(prefabFolder);
         string prefabPath = $"{prefabFolder}/CharacterCard.prefab";
         
