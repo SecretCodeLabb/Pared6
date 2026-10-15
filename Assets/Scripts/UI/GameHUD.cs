@@ -65,13 +65,22 @@ public class GameHUD : MonoBehaviour
     private bool handRaised;
     private int selectedHandIndex = -1;
 
-    private GameObject combatPanel;
-    private TextMeshProUGUI combatTitle;
-    private TextMeshProUGUI combatBody;
-    private TextMeshProUGUI combatResult;
-    private Button useCardButton;
-    private Button skipCardButton;
-    private Button combatRollButton;
+    private CombatVsView combatView;
+    private GameObject menuOverlay;
+    private Button exitButton;
+    private GameObject playersPanel;
+
+    // Own character card (bottom-left) with the lives left under it.
+    private RectTransform characterCard;
+    private Image characterPortrait;
+    private TextMeshProUGUI characterName;
+    private TextMeshProUGUI characterAbility;
+    private TextMeshProUGUI characterLives;
+    private CanvasGroup characterGroup;
+    private int shownCharacterId = -2;
+    private int shownLives = -1;
+    private float livesPunchAt = -10f;
+    private float exitConfirmUntil;
 
     private GameObject endPanel;
     private TextMeshProUGUI endTitle;
@@ -113,6 +122,7 @@ public class GameHUD : MonoBehaviour
     {
         PulseButtons();
         LayoutHand();
+        AnimateCharacterCard();
 
         if (Time.unscaledTime < nextRefresh)
             return;
@@ -147,8 +157,9 @@ public class GameHUD : MonoBehaviour
         BuildTurnBanner(root);
         BuildPlayersPanel(root);
         BuildActionsPanel(root);
+        BuildCharacterCard(root);
         BuildHandPanel(root);
-        BuildCombatPanel(root);
+        combatView = CombatVsView.Create(root, OnUseCardClicked, OnSkipCardClicked, OnCombatRollClicked);
         BuildTopButtons(root);
         AdoptSceneDice(root);
 
@@ -165,11 +176,16 @@ public class GameHUD : MonoBehaviour
         BuildRoulette(overlays);
         AdoptEventAnnouncement(overlays);
         diceView = DiceRollView.Create(overlays);
+        BuildGameMenu(overlays);
         BuildEndPanel(overlays);
 
         // Board effects (steps, turn marker, fights, lives, missions). Local and purely visual.
         if (GetComponent<GameFx>() == null)
             gameObject.AddComponent<GameFx>();
+
+        // Touch movement: tap the glowing cells (keyboard arrows still work on PC).
+        if (GetComponent<TapMoveController>() == null)
+            gameObject.AddComponent<TapMoveController>();
     }
 
     /// <summary>
@@ -210,7 +226,8 @@ public class GameHUD : MonoBehaviour
 
     private void BuildTopButtons(Transform root)
     {
-        Button menuButton = UIFactory.CreateButton(root, "MenuButton", "SALIR", OnMenuClicked, UIFactory.DangerColor, 18f);
+        // Exit lives in a menu (the game keeps running) so nobody leaves by accident.
+        Button menuButton = UIFactory.CreateButton(root, "MenuButton", "MENÚ", () => ShowGameMenu(true), new Color(0.18f, 0.18f, 0.24f, 0.95f), 18f);
         UIFactory.Place((RectTransform)menuButton.transform, new Vector2(0f, 1f), new Vector2(12f, -12f), new Vector2(120f, 56f));
 
         // Overview / follow toggle (same as the C key) for touch screens.
@@ -270,51 +287,158 @@ public class GameHUD : MonoBehaviour
 
     private void BuildPlayersPanel(Transform root)
     {
-        Image panel = UIFactory.CreatePanel(root, "PlayersPanel", UIFactory.PanelColor);
-        UIFactory.Place(panel.rectTransform, new Vector2(1f, 1f), new Vector2(-12f, -12f), new Vector2(330f, 380f));
+        // Only texts (no background) so the board stays visible; dark outlines keep them readable.
+        RectTransform panel = UIFactory.CreateRect(root, "PlayersPanel");
+        UIFactory.Place(panel, new Vector2(1f, 1f), new Vector2(-12f, -12f), new Vector2(330f, 380f));
+        playersPanel = panel.gameObject;
 
-        UseRounded(panel);
-        TextMeshProUGUI title = UIFactory.CreateText(panel.transform, "Title", "JUGADORES", 22f);
+        TextMeshProUGUI title = UIFactory.CreateText(panel, "Title", "JUGADORES", 22f, TextAlignmentOptions.TopRight);
         UIFactory.Place(title.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -6f), new Vector2(310f, 30f));
         title.color = UIFactory.AccentColor;
+        Outline(title);
 
-        playersText = UIFactory.CreateText(panel.transform, "PlayersText", "", 17f, TextAlignmentOptions.TopLeft);
+        playersText = UIFactory.CreateText(panel, "PlayersText", "", 18f, TextAlignmentOptions.TopRight);
         UIFactory.Place(playersText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -40f), new Vector2(310f, 280f));
         playersText.richText = true;
         AutoSize(playersText, 11f);
+        Outline(playersText);
 
-        objectiveText = UIFactory.CreateText(panel.transform, "Objective", "", 15f, TextAlignmentOptions.BottomLeft);
+        objectiveText = UIFactory.CreateText(panel, "Objective", "", 15f, TextAlignmentOptions.BottomRight);
         UIFactory.Place(objectiveText.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, 8f), new Vector2(310f, 54f));
         objectiveText.color = UIFactory.AccentColor;
         AutoSize(objectiveText, 11f);
+        Outline(objectiveText);
     }
 
     private void BuildActionsPanel(Transform root)
     {
-        Image panel = UIFactory.CreatePanel(root, "ActionsPanel", UIFactory.PanelColor);
-        UseRounded(panel);
-        UIFactory.Place(panel.rectTransform, new Vector2(0f, 0f), new Vector2(12f, 12f), new Vector2(300f, 414f));
+        // Bottom-left container without background: only the arrows while moving.
+        RectTransform panel = UIFactory.CreateRect(root, "ActionsPanel");
+        UIFactory.Place(panel, new Vector2(0f, 0f), new Vector2(12f, 12f), new Vector2(300f, 414f));
 
-        livesText = UIFactory.CreateText(panel.transform, "LivesText", "", 26f);
-        UIFactory.Place(livesText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -4f), new Vector2(280f, 36f));
+        // Lives are already in the players list.
+        livesText = UIFactory.CreateText(panel, "LivesText", "", 26f);
+        livesText.gameObject.SetActive(false);
 
-        rollTextButton = UIFactory.CreateButton(panel.transform, "RollDiceButton", "TIRAR DADO", OnRollClicked, UIFactory.ButtonColor, 26f);
-        UIFactory.Place((RectTransform)rollTextButton.transform, new Vector2(0.5f, 1f), new Vector2(0f, -42f), new Vector2(280f, 62f));
+        // TIRAR DADO: big, in the middle of the screen and only on your turn.
+        rollTextButton = UIFactory.CreateButton(root, "RollDiceButton", "TIRAR DADO", OnRollClicked, new Color(0.85f, 0.62f, 0.12f), 40f);
+        UIFactory.Place((RectTransform)rollTextButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 10f), new Vector2(340f, 110f));
+        ((RectTransform)rollTextButton.transform).pivot = new Vector2(0.5f, 0.5f);
+        UseRounded(rollTextButton.GetComponent<Image>());
 
-        // Special cards played on the own turn (Silencio líquido, Cívica, Comida Frita).
-        turnCardButton = UIFactory.CreateButton(panel.transform, "TurnCardButton", "USAR CARTA ESPECIAL", OnTurnCardClicked, new Color(0.45f, 0.18f, 0.70f), 18f);
-        UIFactory.Place((RectTransform)turnCardButton.transform, new Vector2(0.5f, 1f), new Vector2(0f, -110f), new Vector2(280f, 50f));
+        // Special cards played on the own turn (Silencio líquido, Cívica, Comida Frita), under the dice button.
+        turnCardButton = UIFactory.CreateButton(root, "TurnCardButton", "USAR CARTA ESPECIAL", OnTurnCardClicked, new Color(0.45f, 0.18f, 0.70f), 20f);
+        UIFactory.Place((RectTransform)turnCardButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -80f), new Vector2(300f, 56f));
+        ((RectTransform)turnCardButton.transform).pivot = new Vector2(0.5f, 0.5f);
+        UseRounded(turnCardButton.GetComponent<Image>());
 
         // Steps left while moving ("3 PASOS"); the arrows only show when they can be used.
-        movesLabel = UIFactory.CreateText(panel.transform, "MoveLabel", "", 24f);
-        UIFactory.Place(movesLabel.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -160f), new Vector2(280f, 30f));
+        movesLabel = UIFactory.CreateText(panel, "MoveLabel", "", 26f);
+        UIFactory.Place(movesLabel.rectTransform, new Vector2(0f, 0f), new Vector2(CharacterCardWidth + 14f, 40f), new Vector2(150f, 34f));
+        movesLabel.alignment = TextAlignmentOptions.Left;
         movesLabel.fontStyle = FontStyles.Bold;
+        Outline(movesLabel);
 
         // Big touch-friendly pad.
-        AddMoveButton(panel.transform, "↑", Vector2Int.up, new Vector2(0f, -190f));
-        AddMoveButton(panel.transform, "←", Vector2Int.left, new Vector2(-94f, -264f));
-        AddMoveButton(panel.transform, "→", Vector2Int.right, new Vector2(94f, -264f));
-        AddMoveButton(panel.transform, "↓", Vector2Int.down, new Vector2(0f, -338f));
+        AddMoveButton(panel, "↑", Vector2Int.up, new Vector2(0f, -190f));
+        AddMoveButton(panel, "←", Vector2Int.left, new Vector2(-94f, -264f));
+        AddMoveButton(panel, "→", Vector2Int.right, new Vector2(94f, -264f));
+        AddMoveButton(panel, "↓", Vector2Int.down, new Vector2(0f, -338f));
+    }
+
+    private const float CharacterCardWidth = 200f;
+
+    /// <summary>The local player's character card, always visible bottom-left, lives counted under it.</summary>
+    private void BuildCharacterCard(Transform root)
+    {
+        RectTransform holder = UIFactory.CreateRect(root, "MyCharacter");
+        UIFactory.Place(holder, new Vector2(0f, 0f), new Vector2(14f, 10f), new Vector2(CharacterCardWidth, CharacterCardWidth / CardLayout.Aspect + 40f));
+        characterGroup = holder.gameObject.AddComponent<CanvasGroup>();
+        characterGroup.blocksRaycasts = false;
+
+        characterCard = UIFactory.CreateRect(holder, "Card");
+        UIFactory.Place(characterCard, new Vector2(0.5f, 1f), Vector2.zero, new Vector2(CharacterCardWidth, CharacterCardWidth / CardLayout.Aspect));
+        characterCard.pivot = new Vector2(0.5f, 0.5f);
+        characterCard.anchoredPosition = new Vector2(0f, -CharacterCardWidth / CardLayout.Aspect * 0.5f);
+
+        CardLayout.AddImage(characterCard, "Window", CardLayout.Window, null, CardLayout.WindowFill, false);
+        characterPortrait = CardLayout.AddImage(characterCard, "Portrait", CardLayout.Picture, null, Color.white, true);
+
+        Sprite frame = Resources.Load<Sprite>("CardsDesign/CartaPersonaje");
+
+        if (frame != null)
+            CardLayout.AddImage(characterCard, "Frame", Rect.MinMaxRect(0f, 0f, 1f, 1f), frame, Color.white, false);
+
+        characterName = UIFactory.CreateText(characterCard, "Name", "", 18f);
+        CardLayout.Fit(characterName.rectTransform, CardLayout.Banner);
+        CardLayout.StyleText(characterName, 18f, Color.white, true);
+        characterName.alignment = TextAlignmentOptions.Center;
+        characterName.outlineWidth = 0.2f;
+        characterName.outlineColor = Color.black;
+
+        characterAbility = UIFactory.CreateText(characterCard, "Ability", "", 16f);
+        CardLayout.Fit(characterAbility.rectTransform, CardLayout.Body);
+        CardLayout.StyleText(characterAbility, 16f, new Color(0.95f, 0.95f, 0.95f));
+        characterAbility.alignment = TextAlignmentOptions.Center;
+
+        characterLives = UIFactory.CreateText(holder, "Lives", "", 24f);
+        UIFactory.Place(characterLives.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, 2f), new Vector2(CharacterCardWidth + 40f, 34f));
+        characterLives.fontStyle = FontStyles.Bold;
+        Outline(characterLives);
+    }
+
+    private void RefreshCharacterCard(PlayerNetworkData local)
+    {
+        if (characterCard == null)
+            return;
+
+        CharacterData character = local != null ? local.Character : null;
+        characterGroup.gameObject.SetActive(character != null);
+
+        if (character == null)
+            return;
+
+        // In a fight the opened hand card sits on this corner: the character card steps aside meanwhile.
+        characterGroup.alpha = OpenCardOnSide && selectedHandIndex >= 0 ? 0f : 1f;
+
+        if (local.CharacterId.Value != shownCharacterId)
+        {
+            shownCharacterId = local.CharacterId.Value;
+            characterPortrait.sprite = character.characterImage;
+            characterPortrait.color = character.characterImage != null ? Color.white : new Color(0f, 0f, 0f, 0f);
+            characterName.text = character.characterName;
+            characterAbility.text = string.IsNullOrEmpty(character.abilityName) ? "" : string.IsNullOrEmpty(character.abilityDescription)
+                ? $"<b>{character.abilityName}</b>"
+                : $"<b>{character.abilityName}</b>\n<size=80%>{character.abilityDescription}</size>";
+        }
+
+        int lives = local.Lives.Value;
+
+        if (lives != shownLives)
+        {
+            if (shownLives >= 0)
+                livesPunchAt = Time.unscaledTime;
+
+            shownLives = lives;
+        }
+
+        bool eliminated = local.State.Value == PlayerLifeState.Eliminated;
+        characterLives.text = eliminated
+            ? "<color=#FF5050>ELIMINADO</color>"
+            : $"<color=#FF4060>{Hearts(lives)}</color>  <color=#FFFFFF>{lives} {(lives == 1 ? "vida" : "vidas")}</color>";
+        characterPortrait.color = eliminated ? new Color(0.4f, 0.4f, 0.4f) : (characterPortrait.sprite != null ? Color.white : characterPortrait.color);
+    }
+
+    /// <summary>Punch on the card when the lives change (every frame).</summary>
+    private void AnimateCharacterCard()
+    {
+        if (characterCard == null)
+            return;
+
+        float t = Time.unscaledTime - livesPunchAt;
+        float punch = t < 0.4f ? Mathf.Sin(t / 0.4f * Mathf.PI) * 0.12f : 0f;
+        characterCard.localScale = Vector3.one * (1f + punch);
+        characterLives.rectTransform.localScale = Vector3.one * (1f + punch * 1.5f);
     }
 
     private void AddMoveButton(Transform parent, string label, Vector2Int direction, Vector2 position)
@@ -324,16 +448,29 @@ public class GameHUD : MonoBehaviour
         moveButtons.Add(button);
     }
 
-    private const float HandCardWidth = 140f;
+    private const float HandCardWidth = 190f;
     private const float HandCardHeight = HandCardWidth / CardLayout.Aspect;
     private const float HandPanelHeight = HandCardHeight + 40f;
 
     // Fan of cards (card-game style): overlapping and tilted along an arc; the open one grows.
-    private const float HandFanWidth = 560f;
-    private const float HandRaisedY = 18f;
-    private const float HandLoweredY = -78f;
-    private const float HandOpenLift = 125f;
-    private const float HandOpenScale = 1.45f;
+    private const float HandFanWidth = 640f;
+    private const float HandRaisedY = -8f;
+    private const float HandLoweredY = -122f;
+    private const float HandCombatY = -106f;
+    private const float HandOpenY = 24f;
+    private const float HandOpenScale = 1.8f;
+
+    // In a fight the open card goes to the left of the VS panel so it never covers its buttons.
+    private static readonly Vector2 HandCombatOpenPosition = new Vector2(-575f, 40f);
+    private const float HandCombatOpenScale = 1.25f;
+
+    private bool handInCombat;
+
+    /// <summary>
+    /// The open card goes to the left side (not the middle) while the board needs to be seen and
+    /// tapped: in a fight and while the local player is moving (the glowing cells stay free).
+    /// </summary>
+    private bool OpenCardOnSide => handInCombat || (TurnManager.Instance != null && TurnManager.Instance.CanLocalPlayerMove());
 
     private void BuildHandPanel(Transform root)
     {
@@ -373,8 +510,11 @@ public class GameHUD : MonoBehaviour
 
         float spacing = n > 1 ? Mathf.Min(HandCardWidth * 0.8f, (HandFanWidth - HandCardWidth) / (n - 1)) : 0f;
         float middle = (n - 1) * 0.5f;
-        float baseY = handRaised ? HandRaisedY : HandLoweredY;
+        float baseY = handInCombat ? HandCombatY : handRaised ? HandRaisedY : HandLoweredY;
         HandCard openCard = null;
+
+        // The title rides on top of the fan (hidden in a fight: the VS panel explains what to do).
+        handTitle.rectTransform.anchoredPosition = new Vector2(0f, baseY + HandCardHeight + 6f);
 
         for (int i = 0; i < n; i++)
         {
@@ -389,7 +529,11 @@ public class GameHUD : MonoBehaviour
 
             if (open)
             {
-                card.SetTarget(new Vector2(offset * spacing * 0.6f, baseY + HandOpenLift - (handRaised ? 0f : HandLoweredY - HandRaisedY)), 0f, HandOpenScale);
+                if (OpenCardOnSide)
+                    card.SetTarget(HandCombatOpenPosition, 0f, HandCombatOpenScale);
+                else
+                    card.SetTarget(new Vector2(0f, HandOpenY), 0f, HandOpenScale);
+
                 openCard = card;
                 continue;
             }
@@ -402,38 +546,6 @@ public class GameHUD : MonoBehaviour
         // The open card is drawn above the rest.
         if (openCard != null)
             openCard.transform.SetAsLastSibling();
-    }
-
-    private void BuildCombatPanel(Transform root)
-    {
-        // Bottom-right, under the players list: the board centre (the fighting pawns and their
-        // effects) stays visible, and the hand stays free to pick cards.
-        Image panel = UIFactory.CreatePanel(root, "CombatPanel", new Color(0.12f, 0.05f, 0.05f, 0.94f));
-        UseRounded(panel);
-        UIFactory.Place(panel.rectTransform, new Vector2(1f, 0f), new Vector2(-12f, 12f), new Vector2(440f, 310f));
-        combatPanel = panel.gameObject;
-
-        combatTitle = UIFactory.CreateText(panel.transform, "Title", "", 24f);
-        UIFactory.Place(combatTitle.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -8f), new Vector2(420f, 36f));
-        combatTitle.color = new Color(1f, 0.45f, 0.35f);
-        AutoSize(combatTitle, 16f);
-
-        combatBody = UIFactory.CreateText(panel.transform, "Body", "", 20f);
-        UIFactory.Place(combatBody.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -44f), new Vector2(420f, 140f));
-        AutoSize(combatBody, 12f);
-
-        combatResult = UIFactory.CreateText(panel.transform, "Result", "", 30f);
-        UIFactory.Place(combatResult.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -186f), new Vector2(420f, 44f));
-        AutoSize(combatResult, 16f);
-
-        useCardButton = UIFactory.CreateButton(panel.transform, "UseCardButton", "USAR CARTA", OnUseCardClicked, UIFactory.OkColor, 18f);
-        UIFactory.Place((RectTransform)useCardButton.transform, new Vector2(0.5f, 0f), new Vector2(-142f, 12f), new Vector2(132f, 62f));
-
-        skipCardButton = UIFactory.CreateButton(panel.transform, "SkipCardButton", "SIN CARTA", OnSkipCardClicked, UIFactory.ButtonColor, 18f);
-        UIFactory.Place((RectTransform)skipCardButton.transform, new Vector2(0.5f, 0f), new Vector2(0f, 12f), new Vector2(132f, 62f));
-
-        combatRollButton = UIFactory.CreateButton(panel.transform, "CombatRollButton", "TIRAR DADO", OnCombatRollClicked, UIFactory.DangerColor, 18f);
-        UIFactory.Place((RectTransform)combatRollButton.transform, new Vector2(0.5f, 0f), new Vector2(142f, 12f), new Vector2(132f, 62f));
     }
 
     private void BuildEndPanel(Transform root)
@@ -461,6 +573,74 @@ public class GameHUD : MonoBehaviour
         UIFactory.Place((RectTransform)menuButton.transform, new Vector2(0.5f, 0f), new Vector2(160f, 26f), new Vector2(290f, 78f));
 
         endPanel.SetActive(false);
+    }
+
+    /// <summary>
+    /// Menu opened from the MENÚ button: the game keeps running (nothing is paused). Leaving needs
+    /// a second tap, so nobody quits by accident.
+    /// </summary>
+    private void BuildGameMenu(Transform overlays)
+    {
+        Image dim = UIFactory.CreatePanel(overlays, "GameMenu", new Color(0f, 0f, 0f, 0.6f));
+        UIFactory.Stretch(dim.rectTransform);
+        menuOverlay = dim.gameObject;
+
+        // Tapping outside the panel closes the menu.
+        Button outside = dim.gameObject.AddComponent<Button>();
+        outside.transition = Selectable.Transition.None;
+        outside.onClick.AddListener(() => ShowGameMenu(false));
+
+        Image panel = UIFactory.CreatePanel(dim.transform, "Panel", UIFactory.PanelColor);
+        UseRounded(panel);
+        UIFactory.Place(panel.rectTransform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(460f, 330f));
+        panel.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+        panel.gameObject.AddComponent<ScaleToFit>();
+
+        TextMeshProUGUI title = UIFactory.CreateText(panel.transform, "Title", "MENÚ", 40f);
+        UIFactory.Place(title.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -18f), new Vector2(420f, 50f));
+        title.color = UIFactory.AccentColor;
+        title.fontStyle = FontStyles.Bold;
+
+        TextMeshProUGUI note = UIFactory.CreateText(panel.transform, "Note", "La partida sigue en curso", 18f);
+        UIFactory.Place(note.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -70f), new Vector2(420f, 28f));
+        note.color = new Color(0.8f, 0.8f, 0.8f);
+
+        Button back = UIFactory.CreateButton(panel.transform, "Back", "VOLVER A LA PARTIDA", () => ShowGameMenu(false), UIFactory.OkColor, 22f);
+        UIFactory.Place((RectTransform)back.transform, new Vector2(0.5f, 1f), new Vector2(0f, -120f), new Vector2(380f, 70f));
+
+        exitButton = UIFactory.CreateButton(panel.transform, "Exit", "SALIR DE LA PARTIDA", OnExitClicked, UIFactory.DangerColor, 22f);
+        UIFactory.Place((RectTransform)exitButton.transform, new Vector2(0.5f, 1f), new Vector2(0f, -210f), new Vector2(380f, 70f));
+
+        menuOverlay.SetActive(false);
+    }
+
+    private void ShowGameMenu(bool show)
+    {
+        if (menuOverlay == null)
+            return;
+
+        menuOverlay.SetActive(show);
+        exitConfirmUntil = 0f;
+        UIFactory.SetLabel(exitButton, "SALIR DE LA PARTIDA");
+    }
+
+    /// <summary>First tap asks for confirmation; a second tap within 3 s leaves the game.</summary>
+    private void OnExitClicked()
+    {
+        if (Time.unscaledTime > exitConfirmUntil)
+        {
+            exitConfirmUntil = Time.unscaledTime + 3f;
+            UIFactory.SetLabel(exitButton, "¿SEGURO? TOCA OTRA VEZ");
+            return;
+        }
+
+        OnMenuClicked();
+    }
+
+    private static void Outline(TextMeshProUGUI text)
+    {
+        text.outlineWidth = 0.22f;
+        text.outlineColor = new Color32(0, 0, 0, 230);
     }
 
     /// <summary>Rounded corners (FxConfig.roundedSquare, 9-sliced) when available.</summary>
@@ -502,7 +682,8 @@ public class GameHUD : MonoBehaviour
             localTurnText.text = "";
             hintText.text = "Esperando a que todos los jugadores estén listos";
             SetActionButtons(false, false);
-            combatPanel.SetActive(false);
+            rollTextButton.gameObject.SetActive(false);
+            combatView.Refresh(null, false);
             handPanel.SetActive(false);
             RefreshToasts();
             return;
@@ -512,8 +693,9 @@ public class GameHUD : MonoBehaviour
         RefreshTurn(turns, local);
         RefreshPlayers(turns);
         RefreshLocal(turns, local);
-        RefreshHand(local);
         RefreshCombat(local);
+        RefreshHand(local);
+        RefreshCharacterCard(local);
         RefreshRoulette();
         RefreshMission(game, local);
         RefreshEnd(turns, game, local);
@@ -588,7 +770,7 @@ public class GameHUD : MonoBehaviour
                 else hint = mine ? "Tira el dado" : $"{who} va a tirar";
                 break;
             case TurnState.Moving:
-                hint = mine ? $"Muévete: {Steps(turns.MovesRemaining.Value)}" : $"{who} se mueve";
+                hint = mine ? $"Toca una casilla verde · {Steps(turns.MovesRemaining.Value)}" : $"{who} se mueve";
                 if (turns.WallWalk.Value) hint += " · <color=#D080FF>atraviesa paredes</color>";
                 break;
             case TurnState.CheckingTile: hint = "..."; break;
@@ -692,8 +874,12 @@ public class GameHUD : MonoBehaviour
             movesLabel.color = CharacterColor(local);
         }
 
+        // Movement is done by tapping the glowing cells on the board (TapMoveController).
         foreach (Button b in moveButtons)
-            b.gameObject.SetActive(canMove);
+            b.gameObject.SetActive(false);
+
+        // The dice button only exists on your turn (the dice animation then takes the middle).
+        rollTextButton.gameObject.SetActive(canRoll);
 
         if (turnCardButton != null)
         {
@@ -728,8 +914,6 @@ public class GameHUD : MonoBehaviour
         if (rollButton != null)
             rollButton.transform.localScale = rollButton.interactable ? Vector3.one * pulse : Vector3.one;
 
-        if (combatRollButton != null)
-            combatRollButton.transform.localScale = combatRollButton.interactable && combatRollButton.gameObject.activeInHierarchy ? Vector3.one * pulse : Vector3.one;
     }
 
     private void SetActionButtons(bool canRoll, bool canMove)
@@ -767,7 +951,7 @@ public class GameHUD : MonoBehaviour
         bool myTurn = turnManager != null && turnManager.IsLocalPlayersTurn && turnManager.State.Value != TurnState.GameOver;
         bool fighting = CombatManager.Instance != null && CombatManager.Instance.IsSpawned && CombatManager.Instance.IsActive && CombatManager.Instance.IsLocalFighter;
         handRaised = myTurn || fighting;
-        handTitle.gameObject.SetActive(handRaised || selectedHandIndex >= 0);
+        handTitle.gameObject.SetActive(!handInCombat && (handRaised || selectedHandIndex >= 0));
 
         if (canUse)
             handTitle.text = "<color=#7CFF8A>▲ Toca una carta y USAR</color>";
@@ -886,180 +1070,19 @@ public class GameHUD : MonoBehaviour
     private void RefreshCombat(PlayerNetworkData local)
     {
         CombatManager combat = CombatManager.Instance;
+        combatView.Refresh(combat, selectedHandIndex >= 0);
 
-        if (combat == null || !combat.IsSpawned || !combat.IsActive)
-        {
-            combatPanel.SetActive(false);
-            return;
-        }
+        bool visible = combatView.Visible;
+        handInCombat = visible && combat.IsLocalFighter;
 
-        combatPanel.SetActive(true);
+        // Nothing on top of the VS panel: the big event banner and the messages step aside.
+        if (visible && EventUI.Instance != null && EventUI.Instance.eventPanel != null && EventUI.Instance.eventPanel.activeSelf)
+            EventUI.Instance.eventPanel.SetActive(false);
 
-        if (combat.IsDuel.Value)
-            RefreshDuel(combat);
-        else
-            RefreshEventCombat(combat);
+        toastText.gameObject.SetActive(!visible);
 
-        CombatManager.Side side = combat.LocalSide;
-        bool isFighter = side != CombatManager.Side.None;
-
-        useCardButton.interactable = combat.CanLocalUseCard() && selectedHandIndex >= 0;
-        skipCardButton.interactable = combat.CanLocalSkipCards();
-        combatRollButton.interactable = combat.CanLocalRoll();
-
-        useCardButton.gameObject.SetActive(isFighter);
-        skipCardButton.gameObject.SetActive(isFighter && !combat.IsDuel.Value);
-        combatRollButton.gameObject.SetActive(isFighter);
-    }
-
-    private void RefreshEventCombat(CombatManager combat)
-    {
-        PlayerNetworkData fighter = PlayerNetworkData.GetByPlayerId(combat.CombatPlayerId.Value);
-        string who = fighter != null ? fighter.CharacterLabel : "?";
-        bool isLocal = combat.IsLocalFighter;
-
-        combatTitle.text = isLocal ? "¡AMENAZA!" : $"¡AMENAZA PARA {who.ToUpper()}!";
-
-        // The target in big: "Saca 4+" (dice + bonus).
-        StringBuilder body = new StringBuilder();
-        body.Append(isLocal ? "Saca " : $"{who} necesita ");
-        body.Append($"<size=190%><b><color=#FFD040>{combat.Required.Value}+</color></b></size>");
-
-        if (combat.LifeProtected.Value)
-            body.Append(isLocal
-                ? "\n<color=#80C0FF>Estás protegido: no perderás vida si fallas</color>"
-                : "\n<color=#80C0FF>Protegido: no perderá vida si falla</color>");
-
-        AppendLastCard(body, combat);
-
-        CombatPhase phase = combat.Phase.Value;
-
-        if ((phase == CombatPhase.Won || phase == CombatPhase.Lost || phase == CombatPhase.Resolving) && combat.Roll.Value > 0)
-            body.Append($"\n<size=140%>{RollText(combat.Roll.Value, combat.RollModifier.Value)}</size>");
-        else if (combat.RollModifier.Value != 0)
-            body.Append($"\n<color=#7CFF8A>Bonus {Signed(combat.RollModifier.Value)}</color>");
-
-        combatBody.text = body.ToString();
-
-        string damage = combat.LifeLoss.Value > 0 ? $"(-{combat.LifeLoss.Value} {Heart})" : "(sin daño)";
-
-        switch (phase)
-        {
-            case CombatPhase.Escaped:
-                combatResult.text = isLocal
-                    ? "<color=#80C0FF>¡ESCAPASTE DE LA ENTIDAD!</color>"
-                    : $"<color=#80C0FF>¡{who.ToUpper()} ESCAPÓ DE LA ENTIDAD!</color>";
-                break;
-            case CombatPhase.Won:
-                combatResult.text = isLocal
-                    ? "<color=#60FF60>¡SUPERASTE EL EVENTO!</color>"
-                    : $"<color=#60FF60>¡{who.ToUpper()} SUPERÓ EL EVENTO!</color>";
-                break;
-            case CombatPhase.Lost:
-                combatResult.text = (isLocal
-                    ? "<color=#FF5050>FALLASTE EL EVENTO</color>"
-                    : $"<color=#FF5050>{who.ToUpper()} FALLÓ EL EVENTO</color>") + $" <size=70%>{damage}</size>";
-                break;
-            case CombatPhase.CardPhase:
-                combatResult.text = isLocal ? "<size=70%>¿Usar una carta?</size>" : $"<size=70%>{who} puede usar una carta...</size>";
-                break;
-            case CombatPhase.Rolling:
-                combatResult.text = isLocal ? "<size=70%>¡Tira el dado!</size>" : $"<size=70%>Esperando la tirada de {who}...</size>";
-                break;
-            default:
-                combatResult.text = "";
-                break;
-        }
-    }
-
-    private void RefreshDuel(CombatManager combat)
-    {
-        PlayerNetworkData attacker = PlayerNetworkData.GetByPlayerId(combat.CombatPlayerId.Value);
-        PlayerNetworkData defender = PlayerNetworkData.GetByPlayerId(combat.DefenderPlayerId.Value);
-        CombatManager.Side side = combat.LocalSide;
-
-        string attackerName = attacker != null ? attacker.CharacterLabel : "?";
-        string defenderName = defender != null ? defender.CharacterLabel : "?";
-        string rivalName = side == CombatManager.Side.Attacker ? defenderName : attackerName;
-
-        combatTitle.text = side != CombatManager.Side.None ? $"¡DUELO CONTRA {rivalName.ToUpper()}!" : "¡DUELO!";
-
-        StringBuilder body = new StringBuilder();
-
-        if (side != CombatManager.Side.None)
-            body.Append("<color=#FFD040>Carta (opcional) y tira el dado</color>\n");
-        else
-            body.Append("<size=85%>Gana el mayor · el perdedor pierde 1 ♥</size>\n");
-
-        body.Append(DuelLine(attacker, combat.Roll.Value, combat.RollModifier.Value, combat.LifeProtected.Value));
-        body.Append("\n<size=90%><color=#FF8060>VS</color></size>\n");
-        body.Append(DuelLine(defender, combat.DefenderRoll.Value, combat.DefenderModifier.Value, combat.DefenderProtected.Value));
-        AppendLastCard(body, combat);
-        combatBody.text = body.ToString();
-
-        switch (combat.Phase.Value)
-        {
-            case CombatPhase.Won:
-                combatResult.text = DuelResult(side, CombatManager.Side.Attacker, attackerName, defender, combat.DefenderLifeLoss.Value);
-                break;
-            case CombatPhase.Lost:
-                combatResult.text = DuelResult(side, CombatManager.Side.Defender, defenderName, attacker, combat.LifeLoss.Value);
-                break;
-            case CombatPhase.Escaped:
-                combatResult.text = "<color=#80C0FF>¡DUELO INTERRUMPIDO!</color> <size=60%>nadie pierde vida</size>";
-                break;
-            case CombatPhase.Draw:
-                combatResult.text = "<color=#FFD040>¡EMPATE!</color> <size=60%>nadie pierde vida</size>";
-                break;
-            default:
-                if (side != CombatManager.Side.None && combat.HasRolled(side))
-                    combatResult.text = $"<size=70%>Esperando la tirada de {rivalName}...</size>";
-                else if (side == CombatManager.Side.None)
-                    combatResult.text = "<size=70%>Esperando las tiradas...</size>";
-                else
-                    combatResult.text = "";
-                break;
-        }
-    }
-
-    /// <summary>"¡GANASTE EL DUELO!" / "PERDISTE EL DUELO" for the duelists, "¡GANA X!" for the spectators.</summary>
-    private static string DuelResult(CombatManager.Side localSide, CombatManager.Side winnerSide, string winnerName, PlayerNetworkData loser, int lifeLoss)
-    {
-        string loss = lifeLoss > 0 ? $"-{lifeLoss} {Heart}" : "sin daño";
-
-        if (localSide == winnerSide)
-            return $"<color=#60FF60>¡GANASTE EL DUELO!</color> <size=60%>{(loser != null ? loser.CharacterLabel : "?")} {loss}</size>";
-
-        if (localSide != CombatManager.Side.None)
-            return $"<color=#FF5050>PERDISTE EL DUELO</color> <size=60%>{(lifeLoss > 0 ? $"pierdes {lifeLoss} {Heart}" : "sin daño")}</size>";
-
-        return $"<color=#60FF60>¡GANA {winnerName.ToUpper()}!</color> <size=60%>{(loser != null ? loser.CharacterLabel : "?")} {loss}</size>";
-    }
-
-    private static string DuelLine(PlayerNetworkData p, int roll, int modifier, bool protectedFromDamage)
-    {
-        string name = p == null ? "?" : p.IsOwner ? "Tú" : p.CharacterLabel;
-        string rollText = roll > 0 ? $"<size=150%>{RollText(roll, modifier)}</size>" : (modifier != 0 ? $"? <color=#7CFF8A>({Signed(modifier)})</color>" : "?");
-        string shield = protectedFromDamage ? " <color=#80C0FF>(escudo)</color>" : "";
-        return $"<color=#{ColorUtility.ToHtmlStringRGB(CharacterColor(p))}>●</color> <b>{name}</b>  {rollText}{shield}";
-    }
-
-    private static string RollText(int roll, int modifier)
-    {
-        return modifier == 0 ? $"<b>{roll}</b>" : $"{roll} {Signed(modifier)} = <b>{roll + modifier}</b>";
-    }
-
-    private static string Signed(int value)
-    {
-        return value >= 0 ? "+ " + value : "- " + (-value);
-    }
-
-    private static void AppendLastCard(StringBuilder body, CombatManager combat)
-    {
-        string lastCard = combat.LocalLastCardText();
-
-        if (!string.IsNullOrEmpty(lastCard))
-            body.Append($"\n<color=#C0FFC0>{lastCard}</color>");
+        // The VS cards already show both fighters' lives; the list would touch the panel on phones.
+        playersPanel.SetActive(!visible);
     }
 
     private void RefreshEnd(TurnManager turns, GameStateManager game, PlayerNetworkData local)

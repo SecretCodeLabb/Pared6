@@ -121,7 +121,7 @@ public class CombatManager : NetworkBehaviour
                local.Hand.Count > 0;
     }
 
-    public bool CanLocalSkipCards() => !IsDuel.Value && LocalSide == Side.Attacker && Phase.Value == CombatPhase.CardPhase;
+    public bool CanLocalSkipCards() => !IsDuel.Value && LocalSide == Side.Attacker && Phase.Value == CombatPhase.CardPhase && !HasRolled(Side.Attacker);
 
     public bool CanLocalRoll()
     {
@@ -375,7 +375,7 @@ public class CombatManager : NetworkBehaviour
         if (!ValidateParticipant(rpcParams.Receive.SenderClientId, out PlayerNetworkData player, out Side side, "SkipCards"))
             return;
 
-        if (IsDuel.Value || side != Side.Attacker || Phase.Value != CombatPhase.CardPhase)
+        if (IsDuel.Value || side != Side.Attacker || Phase.Value != CombatPhase.CardPhase || context.Roll > 0)
             return;
 
         SetLastCard(player, "No usas carta", $"{player.CharacterLabel} no usa carta");
@@ -431,14 +431,30 @@ public class CombatManager : NetworkBehaviour
         sideContext.Roll = UnityEngine.Random.Range(Rules.diceMin, Rules.diceMax + 1);
         SyncContext();
 
-        if (!IsDuel.Value)
+        // Resolve once every side rolled, after the dice animation has played on every screen
+        // (so lives and results never change before the dice lands).
+        if (!IsDuel.Value || (context.Roll > 0 && defenderContext.Roll > 0))
         {
-            ServerResolveEvent();
-            return;
+            StopFinish();
+            finishRoutine = StartCoroutine(ResolveAfterDice());
         }
+    }
 
-        if (context.Roll > 0 && defenderContext.Roll > 0)
+    /// <summary>Seconds the combat dice tumbles on screen before the result is applied.</summary>
+    public float DiceSeconds => Rules.diceAnimationSeconds;
+
+    private IEnumerator ResolveAfterDice()
+    {
+        yield return new WaitForSeconds(Rules.diceAnimationSeconds + 0.5f);
+        finishRoutine = null;
+
+        if (context == null)
+            yield break;
+
+        if (IsDuel.Value)
             ServerResolveDuel();
+        else
+            ServerResolveEvent();
     }
 
     private void ServerResolveEvent()

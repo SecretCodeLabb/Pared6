@@ -25,6 +25,9 @@ public class FxConfig : ScriptableObject
     public Sprite diceFace;
     public Sprite pip;
 
+    [Tooltip("Picture of the entity / event card in the combat VS panel. Replace Art/Fx/Entidad.png.")]
+    public Sprite entityPortrait;
+
     private static FxConfig cached;
 
     public static FxConfig Instance

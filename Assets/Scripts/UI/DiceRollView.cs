@@ -10,8 +10,9 @@ using UnityEngine.UI;
 /// </summary>
 public class DiceRollView : MonoBehaviour
 {
-    private const float Size = 170f;
-    private const float HoldSeconds = 1.1f;
+    private float Size = 170f;
+    private float holdSeconds = 1.1f;
+    private float bounceHeight = 90f;
 
     // Pip layout per face on a 3x3 grid (-1..1).
     private static readonly Vector2[][] Faces =
@@ -34,11 +35,17 @@ public class DiceRollView : MonoBehaviour
     private TextMeshProUGUI label;
     private Coroutine routine;
 
-    public static DiceRollView Create(Transform parent)
+    /// <param name="diceSize">Side of the dice in UI units (170 = big centre dice).</param>
+    /// <param name="hold">Seconds the landed dice stays before fading out.</param>
+    public static DiceRollView Create(Transform parent, float diceSize = 170f, float hold = 1.1f)
     {
         RectTransform root = UIFactory.CreateRect(parent, "DiceRoll");
-        UIFactory.Place(root, new Vector2(0.5f, 0.5f), new Vector2(0f, 40f), new Vector2(420f, 320f));
+        float k = diceSize / 170f;
+        UIFactory.Place(root, new Vector2(0.5f, 0.5f), new Vector2(0f, 40f * k), new Vector2(420f * k, 320f * k));
         DiceRollView view = root.gameObject.AddComponent<DiceRollView>();
+        view.Size = diceSize;
+        view.holdSeconds = hold;
+        view.bounceHeight = 90f * k;
         view.Build();
         return view;
     }
@@ -53,13 +60,13 @@ public class DiceRollView : MonoBehaviour
         shadow = UIFactory.CreatePanel(transform, "Shadow", new Color(0f, 0f, 0f, 0.35f));
         shadow.sprite = config != null ? config.softCircle : null;
         shadow.raycastTarget = false;
-        UIFactory.Place(shadow.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -Size * 0.62f), new Vector2(Size * 1.2f, 40f));
+        UIFactory.Place(shadow.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -Size * 0.5f), new Vector2(Size * 1.2f, Size * 0.24f));
         shadow.rectTransform.pivot = new Vector2(0.5f, 0.5f);
 
         face = UIFactory.CreatePanel(transform, "Dice", Color.white);
         face.sprite = config != null ? config.diceFace : null;
         face.raycastTarget = false;
-        dice = UIFactory.Place(face.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 20f), new Vector2(Size, Size));
+        dice = UIFactory.Place(face.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, Size * 0.12f), new Vector2(Size, Size));
         dice.pivot = new Vector2(0.5f, 0.5f);
 
         pips = new Image[6];
@@ -75,7 +82,7 @@ public class DiceRollView : MonoBehaviour
         }
 
         // Faces above 6 (custom dice) show the number instead of pips.
-        faceNumber = UIFactory.CreateText(dice, "Number", "", 90f);
+        faceNumber = UIFactory.CreateText(dice, "Number", "", Size * 0.53f);
         UIFactory.Stretch(faceNumber.rectTransform);
         faceNumber.color = new Color(0.12f, 0.1f, 0.1f);
         faceNumber.fontStyle = FontStyles.Bold;
@@ -123,17 +130,17 @@ public class DiceRollView : MonoBehaviour
                 nextFace = t + Mathf.Lerp(0.05f, 0.16f, k);
             }
 
-            float bounce = Mathf.Abs(Mathf.Sin(k * Mathf.PI * 3f)) * (1f - k) * 90f;
-            dice.anchoredPosition = new Vector2(Mathf.Sin(k * 9f) * 18f * (1f - k), 20f + bounce);
+            float bounce = Mathf.Abs(Mathf.Sin(k * Mathf.PI * 3f)) * (1f - k) * bounceHeight;
+            dice.anchoredPosition = new Vector2(Mathf.Sin(k * 9f) * 18f * (1f - k) * (Size / 170f), Size * 0.12f + bounce);
             dice.localRotation = Quaternion.Euler(0f, 0f, (1f - k) * 720f * (1f - k) + Mathf.Sin(t * 25f) * 8f * (1f - k));
             dice.localScale = Vector3.one * Mathf.Lerp(0.6f, 1f, Mathf.Min(1f, k * 4f));
-            shadow.rectTransform.localScale = Vector3.one * (1f - bounce / 200f);
+            shadow.rectTransform.localScale = Vector3.one * (1f - bounce / (bounceHeight * 2.2f));
             yield return null;
         }
 
         // Land: final face + punch.
         ShowFace(result);
-        dice.anchoredPosition = new Vector2(0f, 20f);
+        dice.anchoredPosition = new Vector2(0f, Size * 0.12f);
         dice.localRotation = Quaternion.identity;
         label.text = resultLabel;
         label.color = tint;
@@ -148,7 +155,7 @@ public class DiceRollView : MonoBehaviour
 
         dice.localScale = Vector3.one;
         label.rectTransform.localScale = Vector3.one;
-        yield return new WaitForSecondsRealtime(HoldSeconds);
+        yield return new WaitForSecondsRealtime(holdSeconds);
 
         for (float t = 0f; t < 0.3f; t += Time.unscaledDeltaTime)
         {

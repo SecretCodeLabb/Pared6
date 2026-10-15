@@ -19,3 +19,4 @@ MonoBehaviour:
   roundedSquare: {fileID: 21300000, guid: 6baea0147704e114098ce4e5e5893ece, type: 3}
   diceFace: {fileID: 21300000, guid: a41985853129c974c898b91d35fb0485, type: 3}
   pip: {fileID: 21300000, guid: af77ff4e18be8444b9e0226fea5989b0, type: 3}
+  entityPortrait: {fileID: 21300000, guid: 3763ac9157869e1469646376bee85ce0, type: 3}

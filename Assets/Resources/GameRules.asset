@@ -29,6 +29,6 @@ MonoBehaviour:
   damageOnFail: 1
   consumeOnSuccess: 1
   maxCardsPerCombat: 1
-  resultDisplaySeconds: 2.5
+  resultDisplaySeconds: 3.2
   startingHandSize: 3
   allowDuplicateCards: 1

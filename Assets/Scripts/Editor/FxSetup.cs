@@ -48,6 +48,8 @@ public static class FxSetup
             return new Color(1f, 1f, 1f, Mathf.Clamp01((1f - d) * 6f));
         });
 
+        Texture2D entityTexture = EntityTexture("Entidad");
+
         Material particle = MaterialAsset("Fx_Particles", "Universal Render Pipeline/Particles/Unlit", softTexture, true);
         Material ring = MaterialAsset("Fx_Ring", "Universal Render Pipeline/Particles/Unlit", ringTexture, false);
         Material tube = MaterialAsset("Fx_Tube", "Universal Render Pipeline/Particles/Unlit", squareTexture, true);
@@ -67,11 +69,65 @@ public static class FxSetup
         config.roundedSquare = Sprite(squareTexture, 18);
         config.diceFace = Sprite(diceTexture, 0);
         config.pip = Sprite(pipTexture, 0);
+        config.entityPortrait = Sprite(entityTexture, 0);
         EditorUtility.SetDirty(config);
         AssetDatabase.SaveAssets();
 
         Debug.Log("[PPOP] Assets de efectos listos: " + ConfigPath);
         return config;
+    }
+
+    /// <summary>Placeholder entity: a dark silhouette with glowing eyes on a sickly yellow wall (kept if it exists).</summary>
+    private static Texture2D EntityTexture(string name)
+    {
+        string path = $"{ArtFolder}/{name}.png";
+
+        if (!File.Exists(path))
+        {
+            const int w = 256, h = 320;
+            Texture2D texture = new Texture2D(w, h, TextureFormat.RGBA32, false);
+            Color wallTop = new Color(0.78f, 0.72f, 0.42f), wallBottom = new Color(0.45f, 0.40f, 0.20f);
+            Color body = new Color(0.06f, 0.05f, 0.05f), eye = new Color(1f, 0.95f, 0.85f);
+
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    float u = (x - w * 0.5f) / (w * 0.5f), v = y / (float)h;
+                    Color c = Color.Lerp(wallBottom, wallTop, v);
+                    if (x % 32 == 0) c *= 0.92f;
+
+                    // Silhouette: thin long body + round head + long arms.
+                    bool head = (u * u) / 0.06f + ((v - 0.70f) * (v - 0.70f)) / 0.012f < 1f;
+                    bool torso = Mathf.Abs(u) < 0.16f + (0.70f - v) * 0.12f && v > 0.05f && v < 0.66f;
+                    bool arms = Mathf.Abs(Mathf.Abs(u) - (0.30f + (0.62f - v) * 0.35f)) < 0.045f && v > 0.18f && v < 0.62f;
+                    float shade = Mathf.Clamp01(1f - Mathf.Abs(u) * 1.2f);
+
+                    if (head || torso || arms)
+                        c = Color.Lerp(c, body, 0.85f + 0.15f * shade);
+
+                    // Eyes.
+                    float ex = Mathf.Abs(u) - 0.09f, ey = v - 0.71f;
+                    if (head && ex * ex + ey * ey * 4f < 0.0012f)
+                        c = eye;
+
+                    texture.SetPixel(x, y, c);
+                }
+            }
+
+            File.WriteAllBytes(path, texture.EncodeToPNG());
+            Object.DestroyImmediate(texture);
+            AssetDatabase.ImportAsset(path);
+
+            TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath(path);
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.mipmapEnabled = false;
+            importer.textureCompression = TextureImporterCompression.Uncompressed;
+            importer.SaveAndReimport();
+        }
+
+        return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
     }
 
     private static float Distance01(int x, int y, int size)
