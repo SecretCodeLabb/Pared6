@@ -12,8 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 178427cb6a06749409b316dfdbe5236e, type: 3}
   m_Name: Mission_Puppy
   m_EditorClassIdentifier: Pared.Rules::MissionDefinition
-  title: La pelota perdida
-  description: Encuentra la pelota escondida en tu cuarto.
+  title: Escape de la fiesta
+  description: Atrapa las llamadas y las llaves para salir de la fiesta antes de
+    30 s. Los recibos dan tiempo extra y el aguardiente te quita puntos.
   icon: {fileID: 0}
-  minigamePrefab: {fileID: 0}
+  minigamePrefab: {fileID: 3964679272344194321, guid: 59ba79684684b2a44b08c0a792130df8, type: 3}
   tileMarkerPrefab: {fileID: 0}
