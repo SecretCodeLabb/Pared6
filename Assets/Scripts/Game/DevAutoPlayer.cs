@@ -17,6 +17,7 @@ using UnityEngine.SceneManagement;
 ///   -hardrules           (host, testing) harder combats and 2 lives to force eliminations / revives
 ///   -character NAME      pick this character (CharacterData.characterName) if it is free
 ///   -demohand            open / close the cards of the hand every few seconds (UI showcase)
+///   -tapmove             move by tapping the glowing cells (TapMoveController), checking them against the walls
 /// In the Editor: DevAutoPlayer.Enable(autoPlay: true).
 /// It only uses the same requests as the UI; the Host validates everything.
 /// </summary>
@@ -33,6 +34,7 @@ public class DevAutoPlayer : MonoBehaviour
     private int gamesToPlay = 1;
     private string preferredCharacter;
     private static bool demoHand;
+    private static bool tapMove;
     private float nextHandDemo;
     private int handDemoIndex = -1;
 
@@ -63,6 +65,7 @@ public class DevAutoPlayer : MonoBehaviour
             if (args[i] == "-hardrules") hard = true;
             if (args[i] == "-character" && i + 1 < args.Length) character = args[i + 1];
             if (args[i] == "-demohand") demoHand = true;
+            if (args[i] == "-tapmove") tapMove = true;
             if (args[i] == "-players" && i + 1 < args.Length) int.TryParse(args[i + 1], out players);
             if (args[i] == "-games" && i + 1 < args.Length) int.TryParse(args[i + 1], out games);
         }
@@ -386,9 +389,57 @@ public class DevAutoPlayer : MonoBehaviour
                 direction = options[rng.Next(options.Count)];
         }
 
-        if (direction != Vector2Int.zero)
-            turns.RequestMoveFromLocalPlayer(direction);
+        if (direction == Vector2Int.zero)
+            return;
+
+        if (tapMove)
+        {
+            TapByScreen(board, tile, direction);
+            return;
+        }
+
+        turns.RequestMoveFromLocalPlayer(direction);
     }
+
+    /// <summary>
+    /// -tapmove: checks that the glowing cells are exactly the open neighbours (walls / Cívica) and
+    /// moves by tapping the target cell's screen point, like a finger would.
+    /// </summary>
+    private void TapByScreen(BoardManager board, Tile tile, Vector2Int direction)
+    {
+        TapMoveController tap = FindFirstObjectByType<TapMoveController>();
+
+        if (tap == null || !tap.IsActive)
+            return;
+
+        HashSet<Vector2Int> expected = new HashSet<Vector2Int>();
+
+        foreach (Vector2Int d in BoardLayout.Directions)
+        {
+            Tile next = TurnManager.Instance.WallWalk.Value ? board.GetTile(tile.gridPosition + d) : board.GetNeighbor(tile, d);
+
+            if (next != null)
+                expected.Add(tile.gridPosition + d);
+        }
+
+        bool same = expected.SetEquals(tap.Targets);
+        Vector2Int target = tile.gridPosition + direction;
+        bool sent = tap.TapScreen(tap.CellToScreen(target));
+
+        tapStats[same ? 0 : 1]++;
+        tapStats[sent ? 2 : 3]++;
+
+        if (!same || !sent)
+            Debug.LogWarning($"[TapTest] celda {tile.gridPosition} -> {target}: casillas {(same ? "OK" : "DISTINTAS")} ({tap.Targets.Count} vs {expected.Count}), toque {(sent ? "OK" : "FALLÓ")}");
+
+        if (!sent)
+            TurnManager.Instance.RequestMoveFromLocalPlayer(direction);
+
+        if ((tapStats[2] + tapStats[3]) % 10 == 0)
+            Debug.Log($"[TapTest] pasos {tapStats[2] + tapStats[3]} · casillas iguales {tapStats[0]} distintas {tapStats[1]} · toques ok {tapStats[2]} fallidos {tapStats[3]}");
+    }
+
+    private readonly int[] tapStats = new int[4];
 
     private static Vector2Int FirstStepTowards(BoardManager board, Tile start, Vector2Int target)
     {

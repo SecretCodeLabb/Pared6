@@ -664,3 +664,78 @@ public class SpecialCardTests
         Assert.AreEqual(4, ctx.Required);
     }
 }
+
+public class TapMoveRulesTests
+{
+    private static BoardLayout Board(int seed, bool openRooms) => BoardLayout.Generate(new BoardLayout.Settings
+    {
+        centerWidth = 11, centerHeight = 11, centerExtraPathChance = 0.35f,
+        roomWidth = 7, roomDepth = 7, roomExtraPathChance = 0.35f, openRooms = openRooms,
+        north = true, south = true, east = true, west = true
+    }, seed);
+
+    [Test]
+    public void GlowingCellsAreExactlyTheOpenNeighbours()
+    {
+        foreach (bool open in new[] { false, true })
+        {
+            for (int seed = 0; seed < 10; seed++)
+            {
+                BoardLayout layout = Board(seed, open);
+
+                foreach (Vector2Int cell in layout.Cells)
+                {
+                    List<Vector2Int> targets = TapMoveRules.StepTargets(cell, false, layout.CanMove, layout.Contains);
+
+                    foreach (Vector2Int d in BoardLayout.Directions)
+                        Assert.AreEqual(layout.CanMove(cell, d), targets.Contains(cell + d), $"seed {seed} {cell} {d}");
+                }
+            }
+        }
+    }
+
+    [Test]
+    public void PropWallsAddedLaterAreRespected()
+    {
+        BoardLayout layout = Board(3, true);
+        Vector2Int entrance = layout.Entrances[BoardRegion.North];
+        Assert.IsTrue(TapMoveRules.StepTargets(entrance, false, layout.CanMove, layout.Contains).Contains(entrance + Vector2Int.up));
+
+        // A room prop (RoomEnvironment.blockedMoves) closes the way forward.
+        layout.Close(entrance, Vector2Int.up);
+        Assert.IsFalse(TapMoveRules.StepTargets(entrance, false, layout.CanMove, layout.Contains).Contains(entrance + Vector2Int.up));
+        Assert.IsFalse(TapMoveRules.StepTargets(entrance + Vector2Int.up, false, layout.CanMove, layout.Contains).Contains(entrance), "both sides");
+    }
+
+    [Test]
+    public void CivicaCrossesWallsButNeverLeavesTheBoard()
+    {
+        BoardLayout layout = Board(5, false);
+        Vector2Int corner = new Vector2Int(0, 0);
+        List<Vector2Int> targets = TapMoveRules.StepTargets(corner, true, layout.CanMove, layout.Contains);
+
+        foreach (Vector2Int d in BoardLayout.Directions)
+            Assert.AreEqual(layout.Contains(corner + d), targets.Contains(corner + d), d.ToString());
+
+        // At least one walled neighbour somewhere becomes reachable with Cívica.
+        bool crossed = false;
+
+        foreach (Vector2Int cell in layout.Cells)
+            foreach (Vector2Int d in BoardLayout.Directions)
+                if (layout.Contains(cell + d) && !layout.CanMove(cell, d))
+                    crossed |= TapMoveRules.StepTargets(cell, true, layout.CanMove, layout.Contains).Contains(cell + d);
+
+        Assert.IsTrue(crossed);
+    }
+
+    [Test]
+    public void TapPicksTheNearestGlowingCellWithinReach()
+    {
+        List<Vector2Int> targets = new List<Vector2Int> { new Vector2Int(3, 4), new Vector2Int(4, 5) };
+
+        Assert.AreEqual(new Vector2Int(3, 4), TapMoveRules.PickTarget(new Vector2(6.2f, 8.3f), targets, 2f));
+        Assert.AreEqual(new Vector2Int(4, 5), TapMoveRules.PickTarget(new Vector2(8.9f, 10.6f), targets, 2f), "a bit outside the tile still counts");
+        Assert.IsNull(TapMoveRules.PickTarget(new Vector2(20f, 20f), targets, 2f), "far taps do nothing");
+        Assert.IsNull(TapMoveRules.PickTarget(new Vector2(6f, 8f), new List<Vector2Int>(), 2f), "no glowing cells");
+    }
+}
