@@ -18,6 +18,8 @@ using UnityEngine.SceneManagement;
 ///   -character NAME      pick this character (CharacterData.characterName) if it is free
 ///   -demohand            open / close the cards of the hand every few seconds (UI showcase)
 ///   -tapmove             move by tapping the glowing cells (TapMoveController), checking them against the walls
+///   -useability          use the character ability (HUD button / ESCAPAR in fights) every time it is available
+///   -slowcombat          wait 3 s before acting in each fight (screenshots of the combat panel)
 /// In the Editor: DevAutoPlayer.Enable(autoPlay: true).
 /// It only uses the same requests as the UI; the Host validates everything.
 /// </summary>
@@ -35,6 +37,11 @@ public class DevAutoPlayer : MonoBehaviour
     private string preferredCharacter;
     private static bool demoHand;
     private static bool tapMove;
+    private static bool useAbility;
+    private static bool slowCombat;
+    private const float SlowCombatSeconds = 3f;
+    private int slowCombatKey = -1;
+    private float slowCombatUntil;
     private float nextHandDemo;
     private int handDemoIndex = -1;
 
@@ -66,6 +73,8 @@ public class DevAutoPlayer : MonoBehaviour
             if (args[i] == "-character" && i + 1 < args.Length) character = args[i + 1];
             if (args[i] == "-demohand") demoHand = true;
             if (args[i] == "-tapmove") tapMove = true;
+            if (args[i] == "-useability") useAbility = true;
+            if (args[i] == "-slowcombat") slowCombat = true;
             if (args[i] == "-players" && i + 1 < args.Length) int.TryParse(args[i + 1], out players);
             if (args[i] == "-games" && i + 1 < args.Length) int.TryParse(args[i + 1], out games);
         }
@@ -261,6 +270,13 @@ public class DevAutoPlayer : MonoBehaviour
             if (!TryTurnCard(turns, local))
                 turns.RequestRollFromLocalPlayer();
 
+            return;
+        }
+
+        if (useAbility && turns.CanLocalUseAbility())
+        {
+            Debug.Log("[DevAutoPlayer] uses the character ability");
+            turns.RequestUseAbilityFromLocal();
             return;
         }
 
@@ -480,6 +496,28 @@ public class DevAutoPlayer : MonoBehaviour
 
         if (combat == null || !combat.IsLocalFighter)
             return;
+
+        if (slowCombat)
+        {
+            // A new fight (or the second entity of a double fight): wait before acting.
+            int key = TurnManager.Instance.TurnNumber.Value * 10 + combat.EntityRound.Value;
+
+            if (key != slowCombatKey)
+            {
+                slowCombatKey = key;
+                slowCombatUntil = Time.unscaledTime + SlowCombatSeconds;
+            }
+
+            if (Time.unscaledTime < slowCombatUntil)
+                return;
+        }
+
+        if (useAbility && combat.CanLocalEscape())
+        {
+            Debug.Log("[DevAutoPlayer] escapes with the character ability");
+            combat.RequestEscapeFromLocal();
+            return;
+        }
 
         if (combat.CanLocalUseCard() && rng.NextDouble() < 0.5)
         {

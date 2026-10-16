@@ -14,6 +14,8 @@ public class CombatContext
     public int RequiredReduction;
     public int DamageOnFail = 1;
     public int DamageReduction;
+    /// <summary>Defense cards: subtracted from the rival's number (other player's result or the entity's target).</summary>
+    public int RivalReduction;
     public bool PreventLifeLoss;
     public int CardsUsed;
     public readonly List<string> AppliedCards = new List<string>();
@@ -27,7 +29,10 @@ public class CombatContext
 
     public int Result => Roll + RollModifier;
 
-    public int Required => Mathf.Max(0, BaseRequired - RequiredReduction);
+    public int Required => Mathf.Max(0, BaseRequired - RequiredReduction - RivalReduction);
+
+    /// <summary>This side's result in a duel, after the rival's defense cards.</summary>
+    public int ResultAgainst(CombatContext rival) => Mathf.Max(0, Result - (rival != null ? rival.RivalReduction : 0));
 
     public bool IsSuccess => Result >= Required;
 
@@ -47,8 +52,8 @@ public struct DuelOutcome
 }
 
 /// <summary>
-/// Duel between two players with the same dice system: each side's result = roll + modifier.
-/// Higher result wins; the loser takes damage (reduced by its own defence cards). Draw = no damage.
+/// Duel between two players with the same dice system: each side's result = roll + modifier,
+/// minus the rival's defense cards. Higher result wins; the loser takes damage. Draw = no damage.
 /// </summary>
 public static class DuelResolver
 {
@@ -56,12 +61,15 @@ public static class DuelResolver
     {
         DuelOutcome outcome = new DuelOutcome();
 
-        if (attacker.Result > defender.Result)
+        int attackerResult = attacker.ResultAgainst(defender);
+        int defenderResult = defender.ResultAgainst(attacker);
+
+        if (attackerResult > defenderResult)
         {
             outcome.Winner = 1;
             outcome.DefenderLifeLoss = defender.DamageIfDefeated;
         }
-        else if (defender.Result > attacker.Result)
+        else if (defenderResult > attackerResult)
         {
             outcome.Winner = -1;
             outcome.AttackerLifeLoss = attacker.DamageIfDefeated;

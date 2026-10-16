@@ -19,8 +19,12 @@ MonoBehaviour:
   baseDamage: 3
   baseDefense: 3
   abilityName: Scroll time
-  abilityDescription: "Usa su poder de procrastinar para saltarse combates, pero
-    se le acumulan para m\xE1s tarde."
+  abilityDescription: "ESCAPAR de combates contra entidades (no duelos). Cada escape:
+    +25% de que el pr\xF3ximo sea contra 2 entidades seguidas."
+  ability: 2
+  abilityAmount: 2
+  abilityFailChance: 0.65
+  abilityStackChance: 0.25
   boardColor: {r: 0.85, g: 0.45, b: 0.9, a: 1}
   roomPrefab: {fileID: 5948762351358390483, guid: 81e4637d2fbaf0d4bade2908d4dd6b66, type: 3}
   mission: {fileID: 11400000, guid: 568da10fb63af09458e6b7b5943a847d, type: 2}

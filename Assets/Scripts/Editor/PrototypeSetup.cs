@@ -182,11 +182,15 @@ public static class PrototypeSetup
         AddToRollEffect roll1 = EnsureAmountEffect<AddToRollEffect>("AddToRoll_1", 1);
         AddToRollEffect roll2 = EnsureAmountEffect<AddToRollEffect>("AddToRoll_2", 2);
         AddToRollEffect roll3 = EnsureAmountEffect<AddToRollEffect>("AddToRoll_3", 3);
-        ReduceDamageEffect def1 = EnsureAmountEffect<ReduceDamageEffect>("ReduceDamage_1", 1);
-        ReduceDamageEffect def2 = EnsureAmountEffect<ReduceDamageEffect>("ReduceDamage_2", 2);
-        ReduceDamageEffect def3 = EnsureAmountEffect<ReduceDamageEffect>("ReduceDamage_3", 3);
+        // Defense cards subtract their number from the rival's number.
+        DefenseEffect def1 = EnsureAmountEffect<DefenseEffect>("Defense_1", 1);
+        DefenseEffect def2 = EnsureAmountEffect<DefenseEffect>("Defense_2", 2);
+        DefenseEffect def3 = EnsureAmountEffect<DefenseEffect>("Defense_3", 3);
 
         // Available for new cards (not used by the default deck).
+        EnsureAmountEffect<ReduceDamageEffect>("ReduceDamage_1", 1);
+        EnsureAmountEffect<ReduceDamageEffect>("ReduceDamage_2", 2);
+        EnsureAmountEffect<ReduceDamageEffect>("ReduceDamage_3", 3);
         EnsureAmountEffect<ReduceRequiredEffect>("ReduceRequired_1", 1);
         EnsureEffect<PreventLifeLossEffect>("PreventLifeLoss");
 
@@ -195,10 +199,28 @@ public static class PrototypeSetup
             EnsureCard(1, "Golpe +1", "Golpe_1", damage, "Suma +1 a tu tirada de combate.", roll1),
             EnsureCard(2, "Golpe +2", "Golpe_2", damage, "Suma +2 a tu tirada de combate.", roll2),
             EnsureCard(3, "Golpe +3", "Golpe_3", damage, "Suma +3 a tu tirada de combate.", roll3),
-            EnsureCard(4, "Escudo -1", "Escudo_1", defense, "Resta 1 al daño recibido en este combate.", def1),
-            EnsureCard(5, "Escudo -2", "Escudo_2", defense, "Resta 2 al daño recibido en este combate.", def2),
-            EnsureCard(6, "Escudo -3", "Escudo_3", defense, "Resta 3 al daño recibido en este combate.", def3),
-            EnsureCard(8, "Piedra brillante", "Piedra", useless, "No sirve para nada... ¿o sí?", null),
+
+            // Defense and useless cards use final art with the name and text drawn on it (Art/Cards).
+            EnsureCard(4, "Video defensa personal", "VideoDefensaPersonal", defense,
+                "Este video te cambiará la vida. Espera hasta el final: te podrá dar una técnica definitiva. Defensa: resta 1 al número del rival.", def1, "Defensa/VideoDefensaPersonal"),
+            EnsureCard(5, "Señal de pare", "SenalDePare", defense,
+                "No puedes golpearme. Estoy sosteniendo un objeto reglamentario. ¡PARA! Defensa: resta 2 al número del rival.", def2, "Defensa/SenalDePare"),
+            EnsureCard(6, "Emulsión Scott", "EmulsionScott", defense,
+                "Tómese la cucharada, mijo. ¡Que esa entidad no lo vaya a encontrar desnutrido! Defensa: resta 3 al número del rival.", def3, "Defensa/EmulsionScott"),
+            EnsureCard(15, "Jabón Rey", "JabonRey", defense,
+                "¡Cuidado! Tu perseguidor acaba de deslizarse con estilo. Defensa: resta 1 al número del rival.", def1, "Defensa/JabonRey"),
+            EnsureCard(16, "Silla Rimax", "SillaRimax", defense,
+                "Sirve para sentarse, cargar el mercado y bloquear ataques interdimensionales. No incluye cojín. Defensa: resta 2 al número del rival.", def2, "Defensa/SillaRimax"),
+            EnsureCard(8, "Agua estancada", "AguaEstancada", useless,
+                "Tu cuerpo necesita agua. No se especifica que tuviera que ser buena. Solo hidrátate.", null, "Inutiles/AguaEstancada"),
+            EnsureCard(17, "Autoayuda", "Autoayuda", useless,
+                "Las personas exitosas nunca llegan a rendirse. Este libro tiene +400 páginas y todavía no llega a la solución.", null, "Inutiles/Autoayuda"),
+            EnsureCard(18, "Trompo", "Trompo", useless,
+                "¡Mira cómo gira! Seguro que la entidad, tal vez, pueda esperar a que termine.", null, "Inutiles/Trompo"),
+            EnsureCard(19, "VIP gimnasio", "VipGimnasio", useless,
+                "Ser tu mejor versión nunca fue tan fácil. Solo tienes que pagar por ella.", null, "Inutiles/VipGimnasio"),
+            EnsureCard(20, "Diploma", "Diploma", useless,
+                "Invertiste años de tu vida para conseguir este título. Ahora puedes invertir otros años buscando qué hacer con él.", null, "Inutiles/Diploma"),
 
             // Special (purple) cards. Name, description, icon and values are editable on the assets.
             EnsureCard(9, "Silencio líquido", "SilencioLiquido", ability,
@@ -286,7 +308,7 @@ public static class PrototypeSetup
         return effect;
     }
 
-    private static CardData EnsureCard(int id, string displayName, string fileName, CardType type, string description, CardEffect effect)
+    private static CardData EnsureCard(int id, string displayName, string fileName, CardType type, string description, CardEffect effect, string fullArt = null)
     {
         string path = CardsDir + "/Cards/Card_" + id.ToString("00") + "_" + fileName + ".asset";
         CardData card = AssetDatabase.LoadAssetAtPath<CardData>(path);
@@ -301,6 +323,10 @@ public static class PrototypeSetup
         card.type = type;
         card.description = description;
         card.effect = effect;
+
+        if (fullArt != null)
+            card.fullArt = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/Cards/" + fullArt + ".png");
+
         AssetDatabase.CreateAsset(card, path);
         return card;
     }

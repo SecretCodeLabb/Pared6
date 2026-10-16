@@ -10,11 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c995bf1093309df4c9b0164f7fc9faf0, type: 3}
-  m_Name: Card_08_Piedra
+  m_Name: Card_18_Trompo
   m_EditorClassIdentifier: Pared.Rules::CardData
-  id: 8
-  displayName: Piedra brillante
+  id: 18
+  displayName: Trompo
   type: {fileID: 11400000, guid: 6166f1601e066d14db432f221903640e, type: 2}
-  description: "No sirve para nada... \xBFo s\xED?"
+  description: "\xA1Mira c\xF3mo gira! Seguro que la entidad, tal vez, pueda esperar
+    a que termine."
   icon: {fileID: 0}
+  fullArt: {fileID: 21300000, guid: eab30f16ace935a4eb9aaa461d14ed67, type: 3}
   effect: {fileID: 0}

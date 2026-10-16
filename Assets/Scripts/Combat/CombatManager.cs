@@ -32,6 +32,12 @@ public class CombatManager : NetworkBehaviour
     public NetworkVariable<int> CardsUsed = new NetworkVariable<int>(0);
     public NetworkVariable<bool> LifeProtected = new NetworkVariable<bool>(false);
     public NetworkVariable<int> LifeLoss = new NetworkVariable<int>(0);
+    /// <summary>Defense cards of each side: subtracted from the rival's number (shown in the VS panel).</summary>
+    public NetworkVariable<int> RivalReduction = new NetworkVariable<int>(0);
+    /// <summary>Entities in this encounter (2 = Estudiante's double fight) and which one is being fought (1-based).</summary>
+    public NetworkVariable<int> EntityCount = new NetworkVariable<int>(1);
+    public NetworkVariable<int> EntityRound = new NetworkVariable<int>(1);
+    public NetworkVariable<int> DefenderRivalReduction = new NetworkVariable<int>(0);
     /// <summary>Last card note as the other players read it ("Chismosa usó Canicas").</summary>
     public NetworkVariable<FixedString128Bytes> LastCardText = new NetworkVariable<FixedString128Bytes>();
     /// <summary>Same note for the player who played it ("Usaste Canicas").</summary>
@@ -123,6 +129,22 @@ public class CombatManager : NetworkBehaviour
 
     public bool CanLocalSkipCards() => !IsDuel.Value && LocalSide == Side.Attacker && Phase.Value == CombatPhase.CardPhase && !HasRolled(Side.Attacker);
 
+    /// <summary>Estudiante's ESCAPAR button (fights against entities only).</summary>
+    public bool CanLocalEscape()
+    {
+        PlayerNetworkData local = PlayerNetworkData.Local;
+        CharacterData character = local != null ? local.Character : null;
+
+        return LocalSide == Side.Attacker && character != null &&
+               CharacterAbilityRules.CanEscapeCombat(character.ability, IsDuel.Value, Phase.Value, HasRolled(Side.Attacker), EntityCount.Value > 1);
+    }
+
+    public void RequestEscapeFromLocal()
+    {
+        if (CanLocalEscape())
+            RequestEscapeRpc();
+    }
+
     public bool CanLocalRoll()
     {
         Side side = LocalSide;
@@ -138,12 +160,24 @@ public class CombatManager : NetworkBehaviour
     // =========================================================
 
     /// <param name="forced">Roulette "pelea obligatoria": fight an entity even without an event tile.</param>
-    public void ServerBeginCombat(PlayerNetworkData player, Vector2Int cell, bool forced = false)
+    /// <param name="chained">Second entity of a double fight (same tile, right after the first one).</param>
+    public void ServerBeginCombat(PlayerNetworkData player, Vector2Int cell, bool forced = false, bool chained = false)
     {
         if (!IsServer)
             return;
 
         ResetState(player, false);
+
+        if (chained)
+        {
+            EntityRound.Value++;
+        }
+        else
+        {
+            EntityRound.Value = 1;
+            EntityCount.Value = ServerRollDoubleFight(player) ? 2 : 1;
+        }
+
         eventCell = cell;
         ApplyRoulettePenalty(player, context);
         SyncContext();
@@ -152,11 +186,33 @@ public class CombatManager : NetworkBehaviour
         Phase.Value = canUseCards ? CombatPhase.CardPhase : CombatPhase.Rolling;
 
         string header = forced ? "¡PELEA OBLIGATORIA!" : "¡EVENTO!";
+
+        if (EntityCount.Value > 1)
+            header = EntityRound.Value == 1 ? "¡2 ENTIDADES SEGUIDAS!" : "¡SEGUNDA ENTIDAD!";
+
         AnnounceRpc(
             player.PlayerId.Value, header + "\n<size=70%>¡TE HAS ENCONTRADO CON UNA AMENAZA!</size>",
             TurnRotation.NoPlayer, null,
             header + $"\n<size=70%>¡{player.CharacterLabel.ToUpper()} SE HA ENCONTRADO CON UNA AMENAZA!</size>");
         Debug.Log($"{NetworkConnectionManager.GetInstanceTag()} ¡EVENTO! {player.Name} combate en {cell} (requerido {context.Required})");
+    }
+
+    /// <summary>Estudiante: the escaped fights catch up (accumulated chance); a double fight resets the count.</summary>
+    private bool ServerRollDoubleFight(PlayerNetworkData player)
+    {
+        CharacterData character = player.Character;
+        int escapes = player.EscapedCombats.Value;
+
+        if (character == null || escapes <= 0 ||
+            !CharacterAbilityRules.IsDoubleFight(escapes, character.abilityStackChance, UnityEngine.Random.value))
+            return false;
+
+        player.EscapedCombats.Value = 0;
+        GameStateManager.Instance.ServerBroadcast(player,
+            "¡Las entidades que evitaste te alcanzan! Pelea contra 2 entidades seguidas",
+            $"¡Las entidades que evitó {player.CharacterLabel} lo alcanzan! Pelea contra 2 seguidas");
+        Debug.Log($"{NetworkConnectionManager.GetInstanceTag()} Doble combate para {player.Name} ({escapes} escapes)");
+        return true;
     }
 
     public void ServerBeginDuel(PlayerNetworkData attacker, PlayerNetworkData defender)
@@ -165,6 +221,8 @@ public class CombatManager : NetworkBehaviour
             return;
 
         ResetState(attacker, true);
+        EntityCount.Value = 1;
+        EntityRound.Value = 1;
 
         defenderContext = new CombatContext(defender.PlayerId.Value, 0, Rules.damageOnFail);
         DefenderPlayerId.Value = defender.PlayerId.Value;
@@ -214,6 +272,8 @@ public class CombatManager : NetworkBehaviour
         context = null;
         defenderContext = null;
         IsDuel.Value = false;
+        EntityCount.Value = 1;
+        EntityRound.Value = 1;
         Phase.Value = CombatPhase.None;
     }
 
@@ -369,6 +429,39 @@ public class CombatManager : NetworkBehaviour
             Phase.Value = CombatPhase.Rolling;
     }
 
+    /// <summary>Estudiante's ability: leaves the fight against the entity with no result.</summary>
+    [Rpc(SendTo.Server)]
+    private void RequestEscapeRpc(RpcParams rpcParams = default)
+    {
+        if (!ValidateParticipant(rpcParams.Receive.SenderClientId, out PlayerNetworkData player, out Side side, "Escape"))
+            return;
+
+        CharacterData character = player.Character;
+
+        if (side != Side.Attacker || character == null ||
+            !CharacterAbilityRules.CanEscapeCombat(character.ability, IsDuel.Value, Phase.Value, context.Roll > 0, EntityCount.Value > 1))
+        {
+            Debug.LogWarning($"Combat: Escape rejected for {player.Name} (duel {IsDuel.Value}, phase {Phase.Value}, entities {EntityCount.Value}).");
+            return;
+        }
+
+        player.EscapedCombats.Value++;
+        int risk = Mathf.RoundToInt(CharacterAbilityRules.DoubleFightChance(player.EscapedCombats.Value, character.abilityStackChance) * 100f);
+        string ability = string.IsNullOrEmpty(character.abilityName) ? "su habilidad" : character.abilityName;
+
+        SetLastCard(player, $"¡Escapaste con {ability}! Riesgo de 2 entidades: {risk}%", $"¡{player.CharacterLabel} escapó con {ability}!");
+        SyncContext();
+        GameStateManager.Instance.ServerBroadcast(player,
+            $"¡Escapaste del combate! Riesgo de 2 entidades seguidas: {risk}%",
+            $"¡{player.CharacterLabel} escapó del combate con {ability}!");
+        Debug.Log($"{NetworkConnectionManager.GetInstanceTag()} {player.Name} escapa con {ability} (escapes {player.EscapedCombats.Value}, riesgo {risk}%)");
+
+        // Same as an escape card: no damage, no progress, the event stays on its tile.
+        LifeLoss.Value = 0;
+        Phase.Value = CombatPhase.Escaped;
+        finishRoutine = StartCoroutine(FinishAfterDelay());
+    }
+
     [Rpc(SendTo.Server)]
     private void RequestSkipCardsRpc(RpcParams rpcParams = default)
     {
@@ -500,7 +593,7 @@ public class CombatManager : NetworkBehaviour
 
         Phase.Value = outcome.Winner > 0 ? CombatPhase.Won : outcome.Winner < 0 ? CombatPhase.Lost : CombatPhase.Draw;
 
-        Debug.Log($"{NetworkConnectionManager.GetInstanceTag()} Duelo {attacker.Name} {context.Result} vs {defender.Name} {defenderContext.Result} -> {Phase.Value}");
+        Debug.Log($"{NetworkConnectionManager.GetInstanceTag()} Duelo {attacker.Name} {context.ResultAgainst(defenderContext)} vs {defender.Name} {defenderContext.ResultAgainst(context)} -> {Phase.Value}");
 
         finishRoutine = StartCoroutine(FinishAfterDelay());
     }
@@ -521,6 +614,19 @@ public class CombatManager : NetworkBehaviour
         yield return new WaitForSeconds(Rules.resultDisplaySeconds);
         finishRoutine = null;
 
+        // Double fight: the second entity comes right after the first one (if the player survived).
+        PlayerNetworkData fighter = PlayerNetworkData.GetByPlayerId(CombatPlayerId.Value);
+        bool fought = Phase.Value == CombatPhase.Won || Phase.Value == CombatPhase.Lost;
+
+        if (!IsDuel.Value && fought && EntityRound.Value < EntityCount.Value && fighter != null && fighter.IsAlive &&
+            TurnManager.Instance.State.Value == TurnState.Combat)
+        {
+            ServerBeginCombat(fighter, eventCell, true, true);
+            yield break;
+        }
+
+        EntityCount.Value = 1;
+        EntityRound.Value = 1;
         context = null;
         defenderContext = null;
         IsDuel.Value = false;
@@ -572,6 +678,7 @@ public class CombatManager : NetworkBehaviour
         Required.Value = context.Required;
         CardsUsed.Value = context.CardsUsed;
         LifeProtected.Value = context.DamageIfDefeated == 0;
+        RivalReduction.Value = context.RivalReduction;
 
         if (defenderContext != null)
         {
@@ -579,6 +686,7 @@ public class CombatManager : NetworkBehaviour
             DefenderModifier.Value = defenderContext.RollModifier;
             DefenderCardsUsed.Value = defenderContext.CardsUsed;
             DefenderProtected.Value = defenderContext.DamageIfDefeated == 0;
+            DefenderRivalReduction.Value = defenderContext.RivalReduction;
         }
         else
         {
@@ -586,6 +694,7 @@ public class CombatManager : NetworkBehaviour
             DefenderModifier.Value = 0;
             DefenderCardsUsed.Value = 0;
             DefenderProtected.Value = false;
+            DefenderRivalReduction.Value = 0;
         }
     }
 

@@ -10,11 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c995bf1093309df4c9b0164f7fc9faf0, type: 3}
-  m_Name: Card_04_Escudo_1
+  m_Name: Card_16_SillaRimax
   m_EditorClassIdentifier: Pared.Rules::CardData
-  id: 4
-  displayName: Escudo -1
+  id: 16
+  displayName: Silla Rimax
   type: {fileID: 11400000, guid: cb49a20a117b8a54db8d190b3a5bb882, type: 2}
-  description: "Resta 1 al da\xF1o recibido en este combate."
+  description: "Sirve para sentarse, cargar el mercado y bloquear ataques interdimensionales.
+    No incluye coj\xEDn. Defensa: resta 2 al n\xFAmero del rival."
   icon: {fileID: 0}
-  effect: {fileID: 11400000, guid: 09edaec7d52c40746a33077e605fd517, type: 2}
+  fullArt: {fileID: 21300000, guid: eef2de606165f314e99bc02c8fe76ed2, type: 3}
+  effect: {fileID: 11400000, guid: b856917ac819361458c28c09f8cd70d5, type: 2}

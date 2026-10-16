@@ -1,6 +1,7 @@
 # Pared — Unity 6 (6000.3.7f1) LAN multiplayer board game
 
 ## Workflow
+- Quick start: read `docs/RESUMEN_JUEGO.md` (mechanics + current state).
 - Read `docs/AGENT_CONTEXT.md` (rules, architecture) and `docs/PROGRESS.md` (task status) before working.
 - Tasks live in `docs/tasks/T**.md`. One task per session; apply the closing checklist in AGENT_CONTEXT §9.
 - `Assets/DocsCLI/` is a copy of `docs/`; `docs/` is the source of truth.

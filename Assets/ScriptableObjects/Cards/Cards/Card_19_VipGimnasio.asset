@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c995bf1093309df4c9b0164f7fc9faf0, type: 3}
+  m_Name: Card_19_VipGimnasio
+  m_EditorClassIdentifier: Pared.Rules::CardData
+  id: 19
+  displayName: VIP gimnasio
+  type: {fileID: 11400000, guid: 6166f1601e066d14db432f221903640e, type: 2}
+  description: "Ser tu mejor versi\xF3n nunca fue tan f\xE1cil. Solo tienes que pagar
+    por ella."
+  icon: {fileID: 0}
+  fullArt: {fileID: 21300000, guid: 34189a593c3a47b4e9fd6ad5855b7f58, type: 3}
+  effect: {fileID: 0}

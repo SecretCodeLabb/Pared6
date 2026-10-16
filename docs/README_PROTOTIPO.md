@@ -207,8 +207,11 @@ En la mano, la ventana muestra el `icon` de la carta si tiene, o su valor (+2, �
 2. Crea el asset del efecto y asígnalo a una carta. `CombatManager` no cambia.
 
 Efectos incluidos: `AddToRoll(n)`, `ReduceRequired(n)`, `ReduceDamage(n)`, `PreventLifeLoss`.
-Mazo por defecto (tipos del usuario): Golpe +1/+2/+3 (Daño), Escudo −1/−2/−3 (Defensa),
-Truco del oficio (Habilidad, sin efecto aún), Piedra brillante (Inútil).
+Mazo por defecto (tipos del usuario): Golpe +1/+2/+3 (Daño); Defensa (restan N al número del rival: su resultado en un duelo o el número de la entidad):
+Video defensa personal +1, Jabón Rey +1, Señal de pare +2, Silla Rimax +2, Emulsión Scott +3;
+Inútiles (sin efecto): Agua estancada, Autoayuda, Trompo, VIP gimnasio, Diploma.
+Las cartas de defensa e inútiles usan `CardData.fullArt` (Art/Cards/): la imagen ya trae nombre y
+texto, así que en la mano se dibuja solo la imagen, sin marco ni textos encima.
 
 ## Efectos visuales y HUD
 

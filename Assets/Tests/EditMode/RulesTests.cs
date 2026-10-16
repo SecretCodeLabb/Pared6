@@ -264,6 +264,17 @@ public class CombatTests
     }
 
     [Test]
+    public void DefenseLowersTheEntityNumber()
+    {
+        // Entity needs 5; rolling 3 loses, but a +2 defense card lowers the entity to 3.
+        var ctx = new CombatContext(0, 5, 1) { Roll = 3 };
+        Assert.IsFalse(ctx.IsSuccess);
+        Effect<DefenseEffect>(2).Apply(ctx);
+        Assert.AreEqual(3, ctx.Required);
+        Assert.IsTrue(CombatResolver.Resolve(ctx).Won);
+    }
+
+    [Test]
     public void UselessCardChangesNothing()
     {
         var card = ScriptableObject.CreateInstance<CardData>();
@@ -475,14 +486,28 @@ public class DuelTests
     }
 
     [Test]
-    public void DefenceCardProtectsLoser()
+    public void DefenceCardLowersRivalResult()
     {
-        var attacker = new CombatContext(0, 0, 1) { Roll = 2 };
-        var defender = new CombatContext(1, 0, 1) { Roll = 6, };
-        attacker.DamageReduction = 1;
+        // Attacker 4 vs defender 5: the attacker's +2 defense leaves the defender at 3.
+        var attacker = new CombatContext(0, 0, 1) { Roll = 4 };
+        var defender = new CombatContext(1, 0, 1) { Roll = 5 };
+        attacker.RivalReduction = 2;
         DuelOutcome outcome = DuelResolver.Resolve(attacker, defender);
-        Assert.AreEqual(-1, outcome.Winner);
+        Assert.AreEqual(1, outcome.Winner);
+        Assert.AreEqual(1, outcome.DefenderLifeLoss);
         Assert.AreEqual(0, outcome.AttackerLifeLoss);
+    }
+
+    [Test]
+    public void DefenceAndAttackCardsCombine()
+    {
+        // Attacker: 3 + 1 (attack card) - 3 (defender's defense card) = 1, so the defender's 2 wins.
+        var attacker = new CombatContext(0, 0, 1) { Roll = 3, RollModifier = 1 };
+        var defender = new CombatContext(1, 0, 1) { Roll = 2 };
+        defender.RivalReduction = 3;
+        Assert.AreEqual(1, attacker.ResultAgainst(defender));
+        Assert.AreEqual(2, defender.ResultAgainst(attacker));
+        Assert.AreEqual(-1, DuelResolver.Resolve(attacker, defender).Winner);
     }
 
     [Test]
@@ -737,5 +762,152 @@ public class TapMoveRulesTests
         Assert.AreEqual(new Vector2Int(4, 5), TapMoveRules.PickTarget(new Vector2(8.9f, 10.6f), targets, 2f), "a bit outside the tile still counts");
         Assert.IsNull(TapMoveRules.PickTarget(new Vector2(20f, 20f), targets, 2f), "far taps do nothing");
         Assert.IsNull(TapMoveRules.PickTarget(new Vector2(6f, 8f), new List<Vector2Int>(), 2f), "no glowing cells");
+    }
+}
+
+public class CharacterAbilityTests
+{
+    private const CharacterAbility Skater = CharacterAbility.SkaterSprint;
+
+    [Test]
+    public void SkaterOnlyWhileMovingWithStepsLeftOncePerTurn()
+    {
+        Assert.IsTrue(CharacterAbilityRules.CanUse(Skater, TurnState.Moving, 3, false, false));
+        Assert.IsFalse(CharacterAbilityRules.CanUse(Skater, TurnState.WaitingForRoll, 0, false, false), "before rolling");
+        Assert.IsFalse(CharacterAbilityRules.CanUse(Skater, TurnState.Moving, 0, false, false), "no steps left");
+        Assert.IsFalse(CharacterAbilityRules.CanUse(Skater, TurnState.Moving, 3, false, true), "already used this turn");
+        Assert.IsFalse(CharacterAbilityRules.CanUse(Skater, TurnState.Moving, 3, true, false), "during Cívica's wall walk");
+        Assert.IsFalse(CharacterAbilityRules.CanUse(Skater, TurnState.Combat, 3, false, false), "in a fight");
+        Assert.IsFalse(CharacterAbilityRules.CanUse(CharacterAbility.None, TurnState.Moving, 3, false, false), "no ability");
+    }
+
+    [Test]
+    public void SkaterSuccessAddsTwoSteps()
+    {
+        AbilityOutcome outcome = CharacterAbilityRules.Resolve(Skater, 0.9f, 2, 0.65f);
+        Assert.IsTrue(outcome.Success);
+        Assert.AreEqual(2, outcome.ExtraMoves);
+        Assert.AreEqual(0, outcome.SkipTurns);
+    }
+
+    [Test]
+    public void SkaterFailureLosesNextTurnWithoutSteps()
+    {
+        AbilityOutcome outcome = CharacterAbilityRules.Resolve(Skater, 0.3f, 2, 0.65f);
+        Assert.IsFalse(outcome.Success);
+        Assert.AreEqual(0, outcome.ExtraMoves);
+        Assert.AreEqual(1, outcome.SkipTurns);
+    }
+
+    [Test]
+    public void SkaterFailsAbout65PercentOfTheTime()
+    {
+        var rng = new System.Random(1234);
+        int fails = 0;
+        const int Runs = 20000;
+
+        for (int i = 0; i < Runs; i++)
+        {
+            if (!CharacterAbilityRules.Resolve(Skater, (float)rng.NextDouble(), 2, 0.65f).Success)
+                fails++;
+        }
+
+        Assert.AreEqual(0.65, fails / (double)Runs, 0.015);
+    }
+
+    [Test]
+    public void SkaterAssetIsConfigured()
+    {
+        // CharacterData lives in the game assembly: read the asset through its serialized fields.
+        UnityEditor.SerializedObject skater = null;
+
+        foreach (string guid in UnityEditor.AssetDatabase.FindAssets("t:CharacterData"))
+        {
+            var asset = UnityEditor.AssetDatabase.LoadAssetAtPath<ScriptableObject>(UnityEditor.AssetDatabase.GUIDToAssetPath(guid));
+            var so = new UnityEditor.SerializedObject(asset);
+            if (so.FindProperty("characterName").stringValue == "Skater") skater = so;
+        }
+
+        Assert.IsNotNull(skater);
+        Assert.AreEqual((int)Skater, skater.FindProperty("ability").intValue);
+        Assert.AreEqual(2, skater.FindProperty("abilityAmount").intValue);
+        Assert.AreEqual(0.65f, skater.FindProperty("abilityFailChance").floatValue, 0.001f);
+    }
+}
+
+public class StudentEscapeTests
+{
+    private const CharacterAbility Student = CharacterAbility.StudentEscape;
+
+    [Test]
+    public void EscapeOnlyAgainstEntitiesBeforeRolling()
+    {
+        Assert.IsTrue(CharacterAbilityRules.CanEscapeCombat(Student, false, CombatPhase.CardPhase, false, false));
+        Assert.IsTrue(CharacterAbilityRules.CanEscapeCombat(Student, false, CombatPhase.Rolling, false, false), "after SIN CARTA, before rolling");
+        Assert.IsFalse(CharacterAbilityRules.CanEscapeCombat(Student, true, CombatPhase.CardPhase, false, false), "never against players");
+        Assert.IsFalse(CharacterAbilityRules.CanEscapeCombat(Student, false, CombatPhase.Rolling, true, false), "dice already rolled");
+        Assert.IsFalse(CharacterAbilityRules.CanEscapeCombat(Student, false, CombatPhase.Won, false, false), "fight already resolved");
+        Assert.IsFalse(CharacterAbilityRules.CanEscapeCombat(Student, false, CombatPhase.CardPhase, false, true), "not in the double fight");
+        Assert.IsFalse(CharacterAbilityRules.CanEscapeCombat(CharacterAbility.SkaterSprint, false, CombatPhase.CardPhase, false, false), "only the Estudiante");
+    }
+
+    [Test]
+    public void OnlyTheSkaterUsesTheButtonBesideTheCard()
+    {
+        Assert.IsTrue(CharacterAbilityRules.UsesTurnButton(CharacterAbility.SkaterSprint));
+        Assert.IsFalse(CharacterAbilityRules.UsesTurnButton(Student));
+        Assert.IsFalse(CharacterAbilityRules.UsesTurnButton(CharacterAbility.None));
+    }
+
+    [Test]
+    public void DoubleFightChanceAccumulatesWithEveryEscape()
+    {
+        Assert.AreEqual(0f, CharacterAbilityRules.DoubleFightChance(0, 0.25f), 1e-5f);
+        Assert.AreEqual(0.25f, CharacterAbilityRules.DoubleFightChance(1, 0.25f), 1e-5f);
+        Assert.AreEqual(0.5f, CharacterAbilityRules.DoubleFightChance(2, 0.25f), 1e-5f);
+        Assert.AreEqual(0.75f, CharacterAbilityRules.DoubleFightChance(3, 0.25f), 1e-5f);
+        Assert.AreEqual(1f, CharacterAbilityRules.DoubleFightChance(6, 0.25f), 1e-5f, "capped at 100%");
+    }
+
+    [Test]
+    public void NoEscapesNeverDoubles_AndTheChanceDecides()
+    {
+        Assert.IsFalse(CharacterAbilityRules.IsDoubleFight(0, 0.25f, 0f));
+        Assert.IsTrue(CharacterAbilityRules.IsDoubleFight(2, 0.25f, 0.49f));
+        Assert.IsFalse(CharacterAbilityRules.IsDoubleFight(2, 0.25f, 0.5f));
+        Assert.IsTrue(CharacterAbilityRules.IsDoubleFight(4, 0.25f, 0.999f), "4 escapes = always");
+    }
+
+    [Test]
+    public void DoubleFightFrequencyMatchesTheAccumulatedChance()
+    {
+        var rng = new System.Random(99);
+        int doubles = 0;
+        const int Runs = 20000;
+
+        for (int i = 0; i < Runs; i++)
+        {
+            if (CharacterAbilityRules.IsDoubleFight(3, 0.25f, (float)rng.NextDouble()))
+                doubles++;
+        }
+
+        Assert.AreEqual(0.75, doubles / (double)Runs, 0.015);
+    }
+
+    [Test]
+    public void StudentAssetIsConfigured()
+    {
+        UnityEditor.SerializedObject student = null;
+
+        foreach (string guid in UnityEditor.AssetDatabase.FindAssets("t:CharacterData"))
+        {
+            var asset = UnityEditor.AssetDatabase.LoadAssetAtPath<ScriptableObject>(UnityEditor.AssetDatabase.GUIDToAssetPath(guid));
+            var so = new UnityEditor.SerializedObject(asset);
+            if (so.FindProperty("characterName").stringValue == "Estudiante") student = so;
+        }
+
+        Assert.IsNotNull(student);
+        Assert.AreEqual((int)Student, student.FindProperty("ability").intValue);
+        Assert.AreEqual(0.25f, student.FindProperty("abilityStackChance").floatValue, 0.001f);
     }
 }

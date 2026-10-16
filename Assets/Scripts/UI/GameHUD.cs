@@ -77,6 +77,11 @@ public class GameHUD : MonoBehaviour
     private TextMeshProUGUI characterAbility;
     private TextMeshProUGUI characterLives;
     private CanvasGroup characterGroup;
+
+    // Character ability button, right of the character card (between it and the hand fan).
+    private Button abilityButton;
+    private TextMeshProUGUI abilityLabel;
+    private CanvasGroup abilityGroup;
     private int shownCharacterId = -2;
     private int shownLives = -1;
     private float livesPunchAt = -10f;
@@ -385,6 +390,71 @@ public class GameHUD : MonoBehaviour
         UIFactory.Place(characterLives.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, 2f), new Vector2(CharacterCardWidth + 40f, 34f));
         characterLives.fontStyle = FontStyles.Bold;
         Outline(characterLives);
+
+        BuildAbilityButton(root);
+    }
+
+    private const float AbilityButtonWidth = 150f;
+    private const float AbilityButtonHeight = 132f;
+
+    /// <summary>
+    /// Ability button beside the character card: the free strip between the card (left) and the hand
+    /// fan (centre), above the steps counter, so it never covers the hand or the dice button.
+    /// </summary>
+    private void BuildAbilityButton(Transform root)
+    {
+        abilityButton = UIFactory.CreateButton(root, "AbilityButton", "", OnAbilityClicked, UIFactory.AccentColor, 20f);
+        RectTransform rect = (RectTransform)abilityButton.transform;
+        UIFactory.Place(rect, new Vector2(0f, 0f), new Vector2(14f + CharacterCardWidth + 14f, 84f), new Vector2(AbilityButtonWidth, AbilityButtonHeight));
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition += new Vector2(AbilityButtonWidth * 0.5f, AbilityButtonHeight * 0.5f);
+        UseRounded(abilityButton.GetComponent<Image>());
+
+        abilityLabel = abilityButton.GetComponentInChildren<TextMeshProUGUI>();
+        abilityLabel.lineSpacing = -12f;
+        abilityLabel.enableWordWrapping = false;
+        Outline(abilityLabel);
+
+        abilityGroup = abilityButton.gameObject.AddComponent<CanvasGroup>();
+        abilityButton.gameObject.SetActive(false);
+    }
+
+    private void RefreshAbilityButton(TurnManager turns, PlayerNetworkData local)
+    {
+        if (abilityButton == null)
+            return;
+
+        CharacterData character = local != null ? local.Character : null;
+        bool visible = character != null && CharacterAbilityRules.UsesTurnButton(character.ability) && local.IsAlive && turns.State.Value != TurnState.GameOver;
+        abilityButton.gameObject.SetActive(visible);
+
+        if (!visible)
+            return;
+
+        bool canUse = turns.CanLocalUseAbility();
+        abilityButton.interactable = canUse;
+
+        // Same as the character card: steps aside while an opened hand card sits on this corner in a fight.
+        bool hidden = OpenCardOnSide && selectedHandIndex >= 0;
+        abilityGroup.alpha = hidden ? 0f : canUse ? 1f : 0.55f;
+        abilityGroup.blocksRaycasts = !hidden;
+
+        Color color = CharacterColor(local);
+        abilityButton.GetComponent<Image>().color = canUse ? color : Color.Lerp(color, new Color(0.15f, 0.15f, 0.18f), 0.6f);
+
+        string state;
+
+        if (canUse) state = $"{Mathf.RoundToInt(character.abilityFailChance * 100f)}% falla";
+        else if (turns.IsLocalPlayersTurn && turns.AbilityUsed.Value) state = "usada";
+        else state = "al moverte";
+
+        abilityLabel.text = $"<size=150%><b>+{character.abilityAmount}</b></size>\nHABILIDAD\n<size=70%>{state}</size>";
+    }
+
+    private void OnAbilityClicked()
+    {
+        if (TurnManager.Instance != null)
+            TurnManager.Instance.RequestUseAbilityFromLocal();
     }
 
     private void RefreshCharacterCard(PlayerNetworkData local)
@@ -696,6 +766,7 @@ public class GameHUD : MonoBehaviour
         RefreshCombat(local);
         RefreshHand(local);
         RefreshCharacterCard(local);
+        RefreshAbilityButton(turns, local);
         RefreshRoulette();
         RefreshMission(game, local);
         RefreshEnd(turns, game, local);
@@ -914,6 +985,9 @@ public class GameHUD : MonoBehaviour
         if (rollButton != null)
             rollButton.transform.localScale = rollButton.interactable ? Vector3.one * pulse : Vector3.one;
 
+        if (abilityButton != null)
+            abilityButton.transform.localScale = abilityButton.interactable ? Vector3.one * pulse : Vector3.one;
+
     }
 
     private void SetActionButtons(bool canRoll, bool canMove)
@@ -1025,6 +1099,13 @@ public class GameHUD : MonoBehaviour
         UIFactory.Stretch(glow.rectTransform, -6f);
         glow.raycastTarget = false;
         glow.gameObject.SetActive(false);
+
+        // Final art with its own name and text: just the image.
+        if (card != null && card.fullArt != null)
+        {
+            CardLayout.AddImage(root.transform, "FullArt", Rect.MinMaxRect(0f, 0f, 1f, 1f), card.fullArt, Color.white, true);
+            return glow.gameObject;
+        }
 
         CardLayout.AddImage(root.transform, "WindowFill", CardLayout.Window, null, CardLayout.WindowFill, false);
 

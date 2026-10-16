@@ -19,7 +19,11 @@ MonoBehaviour:
   baseDamage: 7
   baseDefense: 7
   abilityName: "M\xE1s velocidad"
-  abilityDescription: "Avanza m\xE1s casillas... pero puede caer."
+  abilityDescription: "Bot\xF3n HABILIDAD al moverte: +2 casillas, pero 65% de fallar
+    y perder tu siguiente turno."
+  ability: 1
+  abilityAmount: 2
+  abilityFailChance: 0.65
   boardColor: {r: 0.95, g: 0.85, b: 0.3, a: 1}
   roomPrefab: {fileID: 5163112373989827298, guid: aa3db0bf0f650894c88ae1bf2b9d8059, type: 3}
   mission: {fileID: 11400000, guid: 0aacd4c4eab86ca459cf6a28b572f9c1, type: 2}

@@ -10,11 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c995bf1093309df4c9b0164f7fc9faf0, type: 3}
-  m_Name: Card_05_Escudo_2
+  m_Name: Card_05_SenalDePare
   m_EditorClassIdentifier: Pared.Rules::CardData
   id: 5
-  displayName: Escudo -2
+  displayName: "Se\xF1al de pare"
   type: {fileID: 11400000, guid: cb49a20a117b8a54db8d190b3a5bb882, type: 2}
-  description: "Resta 2 al da\xF1o recibido en este combate."
+  description: "No puedes golpearme. Estoy sosteniendo un objeto reglamentario. \xA1PARA!
+    Defensa: resta 2 al n\xFAmero del rival."
   icon: {fileID: 0}
-  effect: {fileID: 11400000, guid: 93b30ef16afb0424fb44c563a9b92adc, type: 2}
+  fullArt: {fileID: 21300000, guid: 6644d2a84ae84c34399e818af340433d, type: 3}
+  effect: {fileID: 11400000, guid: b856917ac819361458c28c09f8cd70d5, type: 2}

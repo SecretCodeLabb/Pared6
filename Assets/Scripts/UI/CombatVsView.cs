@@ -57,6 +57,7 @@ public class CombatVsView : MonoBehaviour
     private Button useCardButton;
     private Button skipButton;
     private Button rollButton;
+    private Button escapeButton;
     private Action onUseCard;
     private Action onSkip;
     private Action onRoll;
@@ -130,6 +131,7 @@ public class CombatVsView : MonoBehaviour
         useCardButton = Button("UseCard", "USAR CARTA", UIFactory.OkColor, () => onUseCard?.Invoke());
         skipButton = Button("Skip", "SIN CARTA", UIFactory.ButtonColor, () => onSkip?.Invoke());
         rollButton = Button("Roll", "TIRAR DADO", UIFactory.DangerColor, () => onRoll?.Invoke());
+        escapeButton = Button("Escape", "ESCAPAR", new Color(0.08f, 0.60f, 0.55f), () => CombatManager.Instance?.RequestEscapeFromLocal());
 
         panel.gameObject.SetActive(false);
     }
@@ -256,31 +258,35 @@ public class CombatVsView : MonoBehaviour
         PlayerNetworkData rightPlayer = flip ? attacker : defender;
 
         int attackerRoll = combat.Roll.Value, defenderRoll = combat.DefenderRoll.Value;
-        int attackerTotal = attackerRoll + combat.RollModifier.Value;
-        int defenderTotal = defenderRoll + combat.DefenderModifier.Value;
+        // Defense cards lower the rival's result.
+        int attackerDefense = combat.RivalReduction.Value, defenderDefense = duel ? combat.DefenderRivalReduction.Value : 0;
+        int attackerTotal = Mathf.Max(0, attackerRoll + combat.RollModifier.Value - defenderDefense);
+        int defenderTotal = Mathf.Max(0, defenderRoll + combat.DefenderModifier.Value - attackerDefense);
 
         FillPlayer(left, leftPlayer);
         UpdateSideRoll(left, flip ? defenderRoll : attackerRoll, flip ? defenderTotal : attackerTotal, combat.DiceSeconds, CharacterColor(leftPlayer));
-        SetChips(left, flip ? combat.DefenderModifier.Value : combat.RollModifier.Value, flip ? combat.DefenderProtected.Value : combat.LifeProtected.Value);
+        SetChips(left, flip ? combat.DefenderModifier.Value : combat.RollModifier.Value, flip ? combat.DefenderProtected.Value : combat.LifeProtected.Value,
+            flip ? attackerDefense : defenderDefense);
 
         if (duel)
         {
             FillPlayer(right, rightPlayer);
             UpdateSideRoll(right, flip ? attackerRoll : defenderRoll, flip ? attackerTotal : defenderTotal, combat.DiceSeconds, CharacterColor(rightPlayer));
-            SetChips(right, flip ? combat.RollModifier.Value : combat.DefenderModifier.Value, flip ? combat.LifeProtected.Value : combat.DefenderProtected.Value);
+            SetChips(right, flip ? combat.RollModifier.Value : combat.DefenderModifier.Value, flip ? combat.LifeProtected.Value : combat.DefenderProtected.Value,
+                flip ? defenderDefense : attackerDefense);
         }
         else
         {
             // The entity "rolls" its target number together with the player.
             FillEntity(right, combat.Required.Value);
             UpdateSideRoll(right, attackerRoll > 0 ? Mathf.Max(1, combat.Required.Value) : 0, combat.Required.Value, combat.DiceSeconds, new Color(0.7f, 0.3f, 1f));
-            right.Chips.text = "";
+            SetChips(right, 0, false, attackerDefense);
         }
 
         // Titles.
         string leftName = Name(leftPlayer), rightName = duel ? Name(rightPlayer) : "la entidad";
         bool fighter = localSide != CombatManager.Side.None;
-        title.text = duel ? "¡DUELO!" : "¡AMENAZA!";
+        title.text = duel ? "¡DUELO!" : combat.EntityCount.Value > 1 ? $"¡2 ENTIDADES! ({combat.EntityRound.Value}/{combat.EntityCount.Value})" : "¡AMENAZA!";
         hint.text = Hint(combat, fighter, localSide, leftName, rightName);
 
         string lastCard = combat.LocalLastCardText();
@@ -295,6 +301,10 @@ public class CombatVsView : MonoBehaviour
         SetButton(useCardButton, fighter && canUse, cardSelected);
         SetButton(skipButton, fighter && combat.CanLocalSkipCards(), true);
         SetButton(rollButton, fighter && combat.CanLocalRoll(), true);
+        SetButton(escapeButton, fighter && combat.CanLocalEscape(), true);
+
+        if (escapeButton.gameObject.activeSelf)
+            hint.text += $"\n<size=85%><color=#9CC8FF>{EscapeRisk()}</color></size>";
         LayoutButtons();
     }
 
@@ -396,7 +406,8 @@ public class CombatVsView : MonoBehaviour
         side.Body.text = $"Vence con <b>{required}</b> o más";
     }
 
-    private void SetChips(Side side, int modifier, bool shield)
+    /// <param name="rivalDefense">Rival's defense cards, already subtracted from this side's number.</param>
+    private void SetChips(Side side, int modifier, bool shield, int rivalDefense)
     {
         string chips = "";
 
@@ -404,6 +415,7 @@ public class CombatVsView : MonoBehaviour
         else if (modifier < 0) chips += $"<color=#FF7060>{modifier} penalización</color>";
 
         if (shield) chips += (chips.Length > 0 ? "   " : "") + "<color=#80C8FF>ESCUDO</color>";
+        if (rivalDefense > 0) chips += (chips.Length > 0 ? "   " : "") + $"<color=#80C8FF>-{rivalDefense} por defensa</color>";
 
         side.Chips.text = chips;
     }
@@ -502,7 +514,7 @@ public class CombatVsView : MonoBehaviour
 
     private void LayoutButtons()
     {
-        Button[] buttons = { useCardButton, skipButton, rollButton };
+        Button[] buttons = { useCardButton, skipButton, escapeButton, rollButton };
         int count = 0;
 
         foreach (Button b in buttons)
@@ -518,6 +530,20 @@ public class CombatVsView : MonoBehaviour
             ((RectTransform)b.transform).anchoredPosition = new Vector2(x, 14f);
             x += spacing;
         }
+    }
+
+    /// <summary>Estudiante: what escaping costs (chance of 2 entities in a row in the next fight).</summary>
+    private static string EscapeRisk()
+    {
+        PlayerNetworkData local = PlayerNetworkData.Local;
+        CharacterData character = local != null ? local.Character : null;
+
+        if (character == null)
+            return "";
+
+        int now = Mathf.RoundToInt(CharacterAbilityRules.DoubleFightChance(local.EscapedCombats.Value, character.abilityStackChance) * 100f);
+        int next = Mathf.RoundToInt(CharacterAbilityRules.DoubleFightChance(local.EscapedCombats.Value + 1, character.abilityStackChance) * 100f);
+        return $"ESCAPAR: riesgo de 2 entidades seguidas {now}% → {next}%";
     }
 
     private static string Name(PlayerNetworkData p) => p != null ? p.CharacterLabel : "?";

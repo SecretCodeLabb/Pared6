@@ -42,6 +42,8 @@ public class TurnManager : NetworkBehaviour
 
     // One own-turn special card per turn; event cells dodged this turn are not re-triggered.
     private bool turnCardUsedThisTurn;
+    /// <summary>The active player already used its character ability this turn.</summary>
+    public NetworkVariable<bool> AbilityUsed = new NetworkVariable<bool>(false);
     private readonly HashSet<Vector2Int> avoidedEventsThisTurn = new HashSet<Vector2Int>();
     // Event cells where the dodge already failed this turn (decided once, never re-rolled).
     private readonly HashSet<Vector2Int> engagedEventsThisTurn = new HashSet<Vector2Int>();
@@ -192,6 +194,7 @@ public class TurnManager : NetworkBehaviour
         TurnNumber.Value++;
         rouletteDoneThisTurn = false;
         turnCardUsedThisTurn = false;
+        AbilityUsed.Value = false;
         avoidedEventsThisTurn.Clear();
         engagedEventsThisTurn.Clear();
         WallWalk.Value = false;
@@ -266,7 +269,7 @@ public class TurnManager : NetworkBehaviour
 
             candidate.SkipTurns.Value--;
             candidate.ServerTickTurnEffects();
-            GameStateManager.Instance.ServerBroadcast(candidate, "Pierdes este turno (ruleta)", $"{candidate.CharacterLabel} pierde este turno (ruleta)");
+            GameStateManager.Instance.ServerBroadcast(candidate, "Pierdes este turno", $"{candidate.CharacterLabel} pierde este turno");
             next = TurnRotation.GetNextPlayer(next, states);
         }
 
@@ -643,6 +646,61 @@ public class TurnManager : NetworkBehaviour
         State.Value = TurnState.Combat;
         RestartDeadline();
         CombatManager.Instance.ServerBeginCombat(player, player.GridPosition.Value, true);
+    }
+
+    // =========================================================
+    // CHARACTER ABILITY (button next to the character card)
+    // =========================================================
+
+    /// <summary>The local player can use its character ability right now.</summary>
+    public bool CanLocalUseAbility()
+    {
+        PlayerNetworkData local = PlayerNetworkData.Local;
+        CharacterData character = local != null ? local.Character : null;
+
+        return IsSpawned && IsLocalPlayersTurn && character != null && !DiceRolling.Value &&
+               CharacterAbilityRules.CanUse(character.ability, State.Value, MovesRemaining.Value, WallWalk.Value, AbilityUsed.Value);
+    }
+
+    public void RequestUseAbilityFromLocal()
+    {
+        if (CanLocalUseAbility())
+            RequestUseAbilityRpc();
+    }
+
+    [Rpc(SendTo.Server)]
+    private void RequestUseAbilityRpc(RpcParams rpcParams = default)
+    {
+        if (!ValidateActivePlayer(rpcParams.Receive.SenderClientId, State.Value, out PlayerNetworkData player, "UseAbility"))
+            return;
+
+        CharacterData character = player.Character;
+
+        if (character == null || DiceRolling.Value ||
+            !CharacterAbilityRules.CanUse(character.ability, State.Value, MovesRemaining.Value, WallWalk.Value, AbilityUsed.Value))
+        {
+            Debug.LogWarning($"TurnManager: UseAbility rejected for {player.Name} (state {State.Value}, moves {MovesRemaining.Value}, used {AbilityUsed.Value}).");
+            return;
+        }
+
+        AbilityUsed.Value = true;
+        AbilityOutcome outcome = CharacterAbilityRules.Resolve(character.ability, UnityEngine.Random.value, character.abilityAmount, character.abilityFailChance);
+        GameStateManager game = GameStateManager.Instance;
+
+        if (outcome.Success)
+        {
+            MovesRemaining.Value += outcome.ExtraMoves;
+            RestartDeadline();
+            game.ServerBroadcast(player, $"¡Lograste avanzar {outcome.ExtraMoves} casillas más!", $"¡{player.CharacterLabel} avanza {outcome.ExtraMoves} casillas más!");
+        }
+        else
+        {
+            // The current movement goes on; the next turn is skipped.
+            player.SkipTurns.Value += outcome.SkipTurns;
+            game.ServerBroadcast(player, "¡Habilidad especial falló! Pierdes tu siguiente turno", $"¡La habilidad de {player.CharacterLabel} falló! Pierde su siguiente turno");
+        }
+
+        Debug.Log($"{NetworkConnectionManager.GetInstanceTag()} Habilidad {character.ability} de {player.Name}: {(outcome.Success ? "OK +" + outcome.ExtraMoves : "FALLÓ, pierde turno")}");
     }
 
     // =========================================================

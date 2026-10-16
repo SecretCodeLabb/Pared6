@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c995bf1093309df4c9b0164f7fc9faf0, type: 3}
+  m_Name: Card_17_Autoayuda
+  m_EditorClassIdentifier: Pared.Rules::CardData
+  id: 17
+  displayName: Autoayuda
+  type: {fileID: 11400000, guid: 6166f1601e066d14db432f221903640e, type: 2}
+  description: "Las personas exitosas nunca llegan a rendirse. Este libro tiene +400
+    p\xE1ginas y todav\xEDa no llega a la soluci\xF3n."
+  icon: {fileID: 0}
+  fullArt: {fileID: 21300000, guid: 8297d8b5a27a3a442b27d5bcca5a5d82, type: 3}
+  effect: {fileID: 0}

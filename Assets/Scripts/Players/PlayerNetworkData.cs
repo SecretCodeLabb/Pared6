@@ -42,6 +42,9 @@ public class PlayerNetworkData : NetworkBehaviour
     public NetworkVariable<int> EventShieldTurns = new NetworkVariable<int>(0);
     public NetworkVariable<float> EventShieldChance = new NetworkVariable<float>(0f);
 
+    /// <summary>Estudiante: fights escaped with the ability since the last double fight (raises its chance).</summary>
+    public NetworkVariable<int> EscapedCombats = new NetworkVariable<int>(0);
+
     /// <summary>The player completed their character's mission (wins the game).</summary>
     public NetworkVariable<bool> MissionCompleted = new NetworkVariable<bool>(false);
 
